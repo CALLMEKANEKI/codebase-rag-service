@@ -74,3 +74,53 @@ def test_citation_schema_requires_all_expected_fields(openapi_spec):
     required = set(openapi_spec["components"]["schemas"]["Citation"]["required"])
 
     assert EXPECTED_CITATION_FIELDS <= required
+
+
+def test_error_response_requires_details(openapi_spec):
+    required = set(
+        openapi_spec["components"]["schemas"]["ErrorResponse"]["properties"]["error"][
+            "required"
+        ]
+    )
+
+    assert required == {"code", "message", "details"}
+
+
+def test_error_response_examples_include_details(openapi_spec):
+    def resolve_response(response):
+        while "$ref" in response:
+            response_ref = response["$ref"]
+            assert response_ref.startswith("#/components/responses/")
+            response_name = response_ref.rsplit("/", 1)[-1]
+            response = openapi_spec["components"]["responses"][response_name]
+        return response
+
+    def iter_examples(response):
+        for media_type in response.get("content", {}).values():
+            if "example" in media_type:
+                yield media_type["example"]
+            for example in media_type.get("examples", {}).values():
+                if "value" in example:
+                    yield example["value"]
+
+    error_responses = []
+    for path, path_item in openapi_spec["paths"].items():
+        for method, operation in path_item.items():
+            if method.lower() not in HTTP_METHODS:
+                continue
+            for status, response in operation.get("responses", {}).items():
+                if status.isdigit() and int(status) >= 400:
+                    error_responses.append(
+                        (f"{method.upper()} {path} response {status}", response)
+                    )
+
+    error_responses.extend(
+        (f"components.responses.{name}", response)
+        for name, response in openapi_spec["components"]["responses"].items()
+    )
+
+    for location, response in error_responses:
+        for example in iter_examples(resolve_response(response)):
+            assert "details" in example.get("error", {}), (
+                f"{location} example is missing error.details"
+            )

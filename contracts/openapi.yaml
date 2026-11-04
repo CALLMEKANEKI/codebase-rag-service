@@ -506,7 +506,7 @@ components:
       properties:
         error:
           type: object
-          required: [code, message]
+          required: [code, message, details]
           properties:
             code:
               $ref: '#/components/schemas/ErrorCode'
