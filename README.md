@@ -21,6 +21,10 @@ is for local development only and is not authentication.
 
 Run these examples in another PowerShell terminal while Prism is running:
 
+In Windows PowerShell 5.1, `Invoke-RestMethod` and `Invoke-WebRequest` throw on
+4xx/5xx responses, so the error body is not printed by default. To see an error
+body, use `curl.exe`, or `Invoke-WebRequest -SkipHttpErrorCheck` in PowerShell 7.
+
 ```powershell
 $baseUrl = 'http://localhost:4010'
 $headers = @{ 'X-API-Key' = 'test-key' }
@@ -64,11 +68,28 @@ contract:
   `ready` example.
 - The mock does not authenticate API-key values: the empty key returned `401`,
   while `wrong` returned `202`.
-- Error responses selected for query with `Prefer: code=409` or `code=504`
-  returned the requested status and `application/json`, but an empty body.
-  Omitting the required `path` query parameter returned `400` with
-  `application/json` and an empty body. Posting the tested GitLab URL returned
-  `422` with `application/json` and an empty body.
+- Error responses defined in the contract return a JSON body that follows
+  `ErrorResponse` (`error.code`, `error.message`, `error.details`). For example,
+  `Prefer: code=409` on `POST /v1/query` returns `INDEX_NOT_READY`, and
+  `Prefer: code=504` returns `TIMEOUT`.
+- When a request fails validation and the contract defines a `400` or `422`
+  response for that operation, Prism returns that response's fixed example
+  regardless of the real cause. For example, omitting the required `path` query
+  parameter on `GET /v1/indexes/{id}/files` returns the fixed `400`
+  `INVALID_RANGE` example, and posting a non-GitHub URL to `POST /v1/indexes`
+  returns the fixed `422` `INVALID_REPO` example. The real service may return a
+  different code for the same input, so do not rely on the mock to learn
+  validation behavior.
+- `IndexStatus.error` (returned by `GET /v1/indexes/{id}` when `status` is
+  `failed`) has only `code` and `message`. It is a different shape from the HTTP
+  `ErrorResponse` envelope, which always includes `details`.
+- All sample data (index ID, commit SHA, file content such as the `verify_token`
+  snippet shown for `src/flask/app.py`) is fictional and only illustrates the
+  response shapes.
+- In Windows PowerShell 5.1, `Invoke-RestMethod` and `Invoke-WebRequest` throw
+  on 4xx/5xx responses, so the error body is not printed by default. To see an
+  error body, use `curl.exe`, or `Invoke-WebRequest -SkipHttpErrorCheck` in
+  PowerShell 7.
 - An invalid index ID (`bad-id`) returned Prism's generated `422` response
   with `application/problem+json`, not the contract's `ErrorResponse` shape.
 - These mock responses do not exercise the service's actual authentication,
