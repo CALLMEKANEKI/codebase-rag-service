@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import argparse
@@ -27,8 +26,16 @@ MODELS = {
 }
 
 SKIP_DIRS = {
-    ".git", ".venv", "venv", "env", "__pycache__",
-    "node_modules", "vendor", "dist", "build", ".tox",
+    ".git",
+    ".venv",
+    "venv",
+    "env",
+    "__pycache__",
+    "node_modules",
+    "vendor",
+    "dist",
+    "build",
+    ".tox",
 }
 
 
@@ -89,7 +96,7 @@ def collect_code_chunks(
         # Fixed-size character slices isolate embedding throughput
         # before the production chunker has been implemented.
         for offset in range(0, len(source), chunk_chars):
-            snippet = source[offset:offset + chunk_chars].strip()
+            snippet = source[offset : offset + chunk_chars].strip()
 
             if not snippet:
                 continue
@@ -105,9 +112,7 @@ def collect_code_chunks(
             break
 
     if not chunks:
-        raise SystemExit(
-            "No Python source chunks found. Check the --input-dir paths."
-        )
+        raise SystemExit("No Python source chunks found. Check the --input-dir paths.")
 
     return chunks
 
@@ -213,7 +218,7 @@ def main():
 
         # Warm-up is excluded from the measured embedding time.
         model.encode(
-            chunks[:min(args.batch_size, len(chunks))],
+            chunks[: min(args.batch_size, len(chunks))],
             batch_size=args.batch_size,
             convert_to_numpy=True,
             show_progress_bar=False,
@@ -237,8 +242,8 @@ def main():
         embedding_seconds = time.perf_counter() - start
 
         if device == "cuda":
-            vram_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)
-            vram_reserved = torch.cuda.max_memory_reserved() / (1024 ** 2)
+            vram_allocated = torch.cuda.max_memory_allocated() / (1024**2)
+            vram_reserved = torch.cuda.max_memory_reserved() / (1024**2)
             gpu_name = torch.cuda.get_device_name(0)
         else:
             vram_allocated = ""
@@ -272,11 +277,9 @@ def main():
         "model_load_seconds_including_download": round(model_load_seconds, 3),
         "embedding_seconds": round(embedding_seconds, 3),
         "chunks_per_second": round(len(chunks) / embedding_seconds, 3),
-        "ram_start_mb": round(rss_start / (1024 ** 2), 2),
-        "ram_peak_mb": round(peak_rss[0] / (1024 ** 2), 2),
-        "ram_peak_delta_mb": round(
-            max(0, peak_rss[0] - rss_start) / (1024 ** 2), 2
-        ),
+        "ram_start_mb": round(rss_start / (1024**2), 2),
+        "ram_peak_mb": round(peak_rss[0] / (1024**2), 2),
+        "ram_peak_delta_mb": round(max(0, peak_rss[0] - rss_start) / (1024**2), 2),
         "vram_peak_allocated_mb": (
             round(vram_allocated, 2) if vram_allocated != "" else ""
         ),
