@@ -41,6 +41,7 @@ Thumbs.db
 *.bak
 
 # Local RAG index data
+storage/
 storage/indexes/
 storage/registry.sqlite*
 storage/qdrant/
