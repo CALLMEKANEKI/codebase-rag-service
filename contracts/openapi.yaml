@@ -1,0 +1,755 @@
+openapi: 3.1.0
+info:
+  title: Codebase RAG Service API
+  version: 0.2.0-draft
+  summary: Contract Web <-> RAG (Draft v0.2)
+  description: |
+    Nguon su that cua Contract Web <-> RAG. Trang "03 - Quy uoc & kien truc chung" tren Notion
+    mo ta cac quyet dinh; neu file nay lech voi Notion thi sua file cho khop (hoac cap nhat Notion
+    truoc khi sua file).
+
+    Quy tac chung:
+    - Moi endpoint can header `X-API-Key`, ngoai tru `GET /v1/health`.
+    - `X-Request-ID` la header tuy chon. Neu client gui, RAG tra lai cung gia tri trong response.
+    - Moi loi (ke ca 401, 404, 409, 422, 5xx) deu theo dang `{ "error": { "code", "message", "details" } }`.
+    - Loi phat sinh sau khi job index da duoc nhan (repo qua lon, clone loi...) KHONG tra HTTP loi dong bo;
+      chung duoc phan anh qua `status = failed` va `error.code` o `GET /v1/indexes/{id}`.
+    - Frontend khong goi RAG truc tiep; chi Web Backend goi RAG (giu `X-API-Key`).
+    - MVP: single-turn (khong co history), baseline retrieval la `dense`, khong rerank.
+servers:
+  - url: http://localhost:8000
+    description: Local development
+security:
+  - ApiKeyAuth: []
+tags:
+  - name: Health
+  - name: Indexes
+  - name: Query
+  - name: Files
+paths:
+  /v1/health:
+    get:
+      operationId: getHealth
+      tags: [Health]
+      summary: Health check
+      description: Khong can API key.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Service dang chay.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+  /v1/indexes:
+    post:
+      operationId: createIndex
+      tags: [Indexes]
+      summary: Tao index cho mot repository (bat dong bo)
+      description: |
+        Kiem tra `repo_url` (dinh dang + allowlist) duoc thuc hien dong bo; sai thi tra `422 INVALID_REPO`.
+        Sau khi nhan job, RAG tra `202` va xu ly nen: pending -> cloning -> parsing -> embedding -> ready
+        (hoac failed). Client theo doi bang `GET /v1/indexes/{id}`.
+        Chi nhan public GitHub repository dang `https://github.com/<owner>/<repo>`.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIndexRequest'
+            example:
+              repo_url: https://github.com/pallets/flask
+              ref: main
+              client_ref: repo_record_42
+      responses:
+        '202':
+          description: Job index da duoc nhan.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateIndexResponse'
+              example:
+                index_id: idx_3f9a1c
+                status: pending
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: URL sai dinh dang hoac nam ngoai allowlist (INVALID_REPO), hoac request khong hop le (INVALID_REQUEST).
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: INVALID_REPO
+                  message: Only public GitHub repositories (https://github.com/<owner>/<repo>) are supported
+                  details:
+                    repo_url: https://gitlab.com/org/repo
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/indexes/{id}:
+    get:
+      operationId: getIndex
+      tags: [Indexes]
+      summary: Lay trang thai index
+      parameters:
+        - $ref: '#/components/parameters/IndexId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Trang thai hien tai cua index.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexStatus'
+              examples:
+                ready:
+                  summary: Index da san sang
+                  value:
+                    index_id: idx_3f9a1c
+                    status: ready
+                    stage: null
+                    progress:
+                      files_done: 24
+                      total_files: 24
+                    commit_sha: d086db856be187255b8ec61ef409357393020f32
+                    stats:
+                      files: 24
+                      chunks: 412
+                    error: null
+                embedding:
+                  summary: Dang tao embedding
+                  value:
+                    index_id: idx_3f9a1c
+                    status: embedding
+                    stage: embedding
+                    progress:
+                      files_done: 10
+                      total_files: 24
+                    commit_sha: d086db856be187255b8ec61ef409357393020f32
+                    stats: null
+                    error: null
+                failed:
+                  summary: Index that bai
+                  value:
+                    index_id: idx_3f9a1c
+                    status: failed
+                    stage: cloning
+                    progress: null
+                    commit_sha: null
+                    stats: null
+                    error:
+                      code: REPO_TOO_LARGE
+                      message: Repository exceeds the configured size limit
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/IndexNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteIndex
+      tags: [Indexes]
+      summary: Xoa index va artifact lien quan
+      description: |
+        Xoa snapshot, vector collection, du lieu BM25 va dong registry cua index.
+        Idempotent: xoa index khong ton tai van tra `204`.
+        Neu index dang chay thi job duoc huy truoc khi don dep.
+      parameters:
+        - $ref: '#/components/parameters/IndexId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '204':
+          description: Da xoa (hoac index khong ton tai).
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/indexes/{id}/files:
+    get:
+      operationId: getIndexFile
+      tags: [Files]
+      summary: Doc noi dung file tu snapshot (cho Code Viewer)
+      description: |
+        Doc dung snapshot gan voi index (khong lay ban moi nhat tu GitHub).
+        Yeu cau bao mat:
+        - chong path traversal: duong dan duoc resolve va bat buoc nam trong snapshot; tu choi `..` va symlink
+          (tra `404 FILE_NOT_FOUND`);
+        - toi da 2000 dong moi request;
+        - neu `end` vuot qua cuoi file thi bi cat ve dong cuoi; `start` vuot qua cuoi file la `400 INVALID_RANGE`.
+        Index chua `ready` tra `409 INDEX_NOT_READY`.
+      parameters:
+        - $ref: '#/components/parameters/IndexId'
+        - $ref: '#/components/parameters/RequestId'
+        - name: path
+          in: query
+          required: true
+          description: Duong dan file tuong doi so voi goc repository (dau `/`, dung `/` lam dau phan cach).
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 1024
+          example: src/flask/app.py
+        - name: start
+          in: query
+          required: false
+          description: Dong bat dau (tinh tu 1, bao gom).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: end
+          in: query
+          required: false
+          description: Dong ket thuc (bao gom). Bo qua thi tra toi da 2000 dong ke tu `start`.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Noi dung doan file yeu cau.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileContent'
+              example:
+                path: src/flask/app.py
+                start: 34
+                end: 36
+                content: "def verify_token(token: str) -> dict:\n    ...\n    return payload\n"
+                language: python
+        '400':
+          description: Khoang dong khong hop le (start > end, start vuot qua cuoi file, hoac qua 2000 dong).
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: INVALID_RANGE
+                  message: Requested line range is invalid
+                  details:
+                    start: 500
+                    end: 100
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Index hoac file khong ton tai (INDEX_NOT_FOUND hoac FILE_NOT_FOUND).
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: FILE_NOT_FOUND
+                  message: File not found in index snapshot
+                  details:
+                    path: src/flask/missing.py
+        '409':
+          $ref: '#/components/responses/IndexNotReady'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/query:
+    post:
+      operationId: queryIndex
+      tags: [Query]
+      summary: Dat cau hoi ve mot index da ready
+      description: |
+        Single-turn. Citation chi lay tu cac chunk da cap cho LLM va duoc he thong kiem tra lai;
+        `[n]` trong `answer` tuong ung `citations[].ref_id`.
+        Baseline MVP chi ho tro `options.mode = dense` va `rerank = false`; gia tri chua ho tro
+        tra `422 INVALID_REQUEST`.
+        Timeout phia Web Backend: 45s; `/v1/query` KHONG tu dong retry khi timeout.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+            example:
+              index_id: idx_3f9a1c
+              question: JWT duoc kiem tra o dau?
+              top_k: 5
+              options:
+                mode: dense
+                rerank: false
+              debug: false
+      responses:
+        '200':
+          description: Cau tra loi kem citation.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+              example:
+                answer: "JWT duoc kiem tra trong `verify_token` [1]."
+                citations:
+                  - ref_id: 1
+                    file_path: app/core/security.py
+                    symbol: verify_token
+                    symbol_kind: function
+                    start_line: 34
+                    end_line: 58
+                    snippet: "def verify_token(token: str) -> dict:\n    ..."
+                    score: 0.91
+                usage: null
+                latency_ms: 850
+                debug: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/IndexNotFound'
+        '409':
+          $ref: '#/components/responses/IndexNotReady'
+        '422':
+          $ref: '#/components/responses/InvalidRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          description: Loi tu LLM (Gemini API).
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: LLM_ERROR
+                  message: The language model request failed
+                  details: {}
+        '504':
+          description: Het thoi gian xu ly.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: TIMEOUT
+                  message: The request timed out
+                  details: {}
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Khoa dich vu RAG. Chi Web Backend giu khoa nay; khong dua vao frontend, khong ghi log.
+  headers:
+    RequestId:
+      description: Gia tri X-Request-ID duoc tra lai (neu client co gui).
+      schema:
+        type: string
+        maxLength: 128
+  parameters:
+    RequestId:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: Ma truy vet do client dat, RAG tra lai trong response.
+      schema:
+        type: string
+        maxLength: 128
+    IndexId:
+      name: id
+      in: path
+      required: true
+      description: Ma index do RAG cap (`index_id`).
+      schema:
+        type: string
+        pattern: '^idx_[A-Za-z0-9_-]+$'
+      example: idx_3f9a1c
+  responses:
+    Unauthorized:
+      description: Thieu hoac sai X-API-Key.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Missing or invalid API key
+              details: {}
+    IndexNotFound:
+      description: Khong tim thay index.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INDEX_NOT_FOUND
+              message: Index not found
+              details:
+                index_id: idx_3f9a1c
+    IndexNotReady:
+      description: Index chua o trang thai ready.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INDEX_NOT_READY
+              message: Index is not ready
+              details:
+                status: embedding
+    InvalidRequest:
+      description: Request khong hop le (validation, cau hoi qua dai, tuy chon chua ho tro).
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INVALID_REQUEST
+              message: Validation failed
+              details:
+                field: question
+                reason: exceeds maximum length of 2000 characters
+    InternalError:
+      description: Loi noi bo.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: Unexpected server error
+              details: {}
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+    ErrorCode:
+      type: string
+      description: |
+        INVALID_REQUEST khong co trong danh sach 11 ma ban dau cua Contract v0.2 Draft;
+        duoc de xuat them de dung cho loi validation (422).
+      enum:
+        - UNAUTHORIZED
+        - REPO_NOT_FOUND
+        - REPO_TOO_LARGE
+        - INVALID_REPO
+        - INVALID_REQUEST
+        - INDEX_NOT_READY
+        - INDEX_NOT_FOUND
+        - FILE_NOT_FOUND
+        - INVALID_RANGE
+        - LLM_ERROR
+        - TIMEOUT
+        - INTERNAL_ERROR
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              $ref: '#/components/schemas/ErrorCode'
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+    CreateIndexRequest:
+      type: object
+      required: [repo_url]
+      properties:
+        repo_url:
+          type: string
+          description: Public GitHub repository, dang `https://github.com/<owner>/<repo>` (khong co `.git`, khong co dau `/` o cuoi).
+          pattern: '^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+          maxLength: 300
+        ref:
+          type: string
+          description: Branch, tag hoac commit. Bo qua thi dung default branch.
+          minLength: 1
+          maxLength: 255
+        client_ref:
+          type: string
+          description: Chuoi tuy chon do Web dat (vi du id ban ghi repository). RAG chi luu de debug, khong dung lam khoa.
+          maxLength: 200
+    CreateIndexResponse:
+      type: object
+      required: [index_id, status]
+      properties:
+        index_id:
+          type: string
+          pattern: '^idx_[A-Za-z0-9_-]+$'
+        status:
+          type: string
+          enum: [pending]
+    IndexStatusValue:
+      type: string
+      enum: [pending, cloning, parsing, embedding, ready, failed]
+    IndexProgress:
+      type: object
+      required: [files_done, total_files]
+      properties:
+        files_done:
+          type: integer
+          minimum: 0
+        total_files:
+          type: integer
+          minimum: 0
+    IndexStats:
+      type: object
+      required: [files, chunks]
+      properties:
+        files:
+          type: integer
+          minimum: 0
+        chunks:
+          type: integer
+          minimum: 0
+    IndexError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+    IndexStatus:
+      type: object
+      required: [index_id, status]
+      properties:
+        index_id:
+          type: string
+          pattern: '^idx_[A-Za-z0-9_-]+$'
+        status:
+          $ref: '#/components/schemas/IndexStatusValue'
+        stage:
+          type: [string, 'null']
+          enum: [cloning, parsing, embedding, null]
+          description: |
+            Buoc dang chay, hoac buoc ma index that bai (khi `status = failed`).
+            `null` khi `pending` hoac `ready`.
+        progress:
+          oneOf:
+            - $ref: '#/components/schemas/IndexProgress'
+            - type: 'null'
+          description: "`null` cho den khi biet tong so file."
+        commit_sha:
+          type: [string, 'null']
+          description: Commit da duoc resolve luc clone (`null` truoc khi clone xong).
+        stats:
+          oneOf:
+            - $ref: '#/components/schemas/IndexStats'
+            - type: 'null'
+          description: Co gia tri khi `status = ready`.
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/IndexError'
+            - type: 'null'
+          description: Co gia tri khi `status = failed`.
+    QueryOptions:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [dense, bm25, hybrid]
+          default: dense
+          description: Baseline MVP chi ho tro `dense`.
+        rerank:
+          type: boolean
+          default: false
+          description: Baseline MVP chua ho tro `true`.
+    QueryRequest:
+      type: object
+      required: [index_id, question]
+      properties:
+        index_id:
+          type: string
+          pattern: '^idx_[A-Za-z0-9_-]+$'
+        question:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+        options:
+          $ref: '#/components/schemas/QueryOptions'
+        debug:
+          type: boolean
+          default: false
+          description: "`true` thi tra them `debug` (cac chunk duoc retrieve va score)."
+    Citation:
+      type: object
+      required:
+        - ref_id
+        - file_path
+        - symbol
+        - symbol_kind
+        - start_line
+        - end_line
+        - snippet
+        - score
+      properties:
+        ref_id:
+          type: integer
+          minimum: 1
+          description: Khop voi marker `[n]` trong `answer`.
+        file_path:
+          type: string
+        symbol:
+          type: [string, 'null']
+          description: Ten ham/class/method; `null` neu chunk khong gan voi symbol nao.
+        symbol_kind:
+          type: [string, 'null']
+          description: "Vi du: function, method, class, module, other."
+        start_line:
+          type: integer
+          minimum: 1
+        end_line:
+          type: integer
+          minimum: 1
+        snippet:
+          type: string
+        score:
+          type: number
+    Usage:
+      type: object
+      properties:
+        input_tokens:
+          type: [integer, 'null']
+        output_tokens:
+          type: [integer, 'null']
+    RetrievedChunk:
+      type: object
+      required: [chunk_id, file_path, start_line, end_line, score]
+      properties:
+        chunk_id:
+          type: string
+        file_path:
+          type: string
+        symbol:
+          type: [string, 'null']
+        symbol_kind:
+          type: [string, 'null']
+        start_line:
+          type: integer
+          minimum: 1
+        end_line:
+          type: integer
+          minimum: 1
+        score:
+          type: number
+        used_in_context:
+          type: boolean
+    DebugInfo:
+      type: object
+      required: [mode, retrieved]
+      properties:
+        mode:
+          type: string
+          enum: [dense, bm25, hybrid]
+        retrieved:
+          type: array
+          items:
+            $ref: '#/components/schemas/RetrievedChunk'
+    QueryResponse:
+      type: object
+      required: [answer, citations, latency_ms]
+      properties:
+        answer:
+          type: string
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Citation'
+        usage:
+          oneOf:
+            - $ref: '#/components/schemas/Usage'
+            - type: 'null'
+        latency_ms:
+          type: integer
+          minimum: 0
+        debug:
+          oneOf:
+            - $ref: '#/components/schemas/DebugInfo'
+            - type: 'null'
+    FileContent:
+      type: object
+      required: [path, start, end, content, language]
+      properties:
+        path:
+          type: string
+        start:
+          type: integer
+          minimum: 1
+        end:
+          type: integer
+          minimum: 1
+        content:
+          type: string
+        language:
+          type: [string, 'null']
+          description: "Vi du: python. `null` neu khong nhan dien duoc."
