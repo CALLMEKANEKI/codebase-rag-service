@@ -1,4 +1,66 @@
-# Mock server (Prism)
+# Codebase RAG Service
+
+Codebase RAG Service is intended to index source repositories and answer
+questions about their code with citations. It provides an API contract and
+development tooling for the planned service.
+
+## Status
+
+- OpenAPI contract v0.2 is available in `contracts/openapi.yaml`.
+- A Prism mock server is available for local API integration.
+- An embedding benchmark script is available in `scripts/benchmark_embeddings.py`.
+- The actual API and RAG pipeline are not implemented yet.
+
+The source of truth for the API contract is `contracts/openapi.yaml`.
+
+## Requirements
+
+- Python 3.11 (standard project Python version; CI uses Python 3.11).
+- Node.js is required only to run the Prism mock server.
+
+## Setup
+
+Create and activate a virtual environment, then install development
+dependencies:
+
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt
+```
+
+`requirements-dev.txt` includes the core packages from `requirements.txt`.
+For embedding/model work, choose exactly one PyTorch runtime:
+
+```powershell
+# CPU
+python -m pip install -r requirements-torch-cpu.txt
+
+# Or GPU; do not install both CPU and GPU requirements.
+python -m pip install -r requirements-torch-gpu.txt
+```
+
+Then install the ML packages when needed:
+
+```powershell
+python -m pip install -r requirements-ml.txt
+```
+
+The GPU requirements use the CUDA 13.2 PyTorch wheel index. This configuration
+matches the command previously used on a laptop, but has not been verified on
+the current machine because CUDA is unavailable.
+
+## Checks
+
+Run the project checks from the repository root:
+
+```powershell
+python -m ruff check .
+python -m ruff format --check .
+python -m pytest -q
+```
+
+## Mock server (Prism)
 
 ## Requirements and startup
 
@@ -20,10 +82,6 @@ is for local development only and is not authentication.
 ## PowerShell examples
 
 Run these examples in another PowerShell terminal while Prism is running:
-
-In Windows PowerShell 5.1, `Invoke-RestMethod` and `Invoke-WebRequest` throw on
-4xx/5xx responses, so the error body is not printed by default. To see an error
-body, use `curl.exe`, or `Invoke-WebRequest -SkipHttpErrorCheck` in PowerShell 7.
 
 ```powershell
 $baseUrl = 'http://localhost:4010'
@@ -67,7 +125,8 @@ contract:
   `idx_3f9a1c`, delete returned `204`; a subsequent GET still returned the fixed
   `ready` example.
 - The mock does not authenticate API-key values: the empty key returned `401`,
-  while `wrong` returned `202`.
+  while `wrong` returned `202`. A request with no X-API-Key header also returned
+  401.
 - Error responses defined in the contract return a JSON body that follows
   `ErrorResponse` (`error.code`, `error.message`, `error.details`). For example,
   `Prefer: code=409` on `POST /v1/query` returns `INDEX_NOT_READY`, and
@@ -86,10 +145,6 @@ contract:
 - All sample data (index ID, commit SHA, file content such as the `verify_token`
   snippet shown for `src/flask/app.py`) is fictional and only illustrates the
   response shapes.
-- In Windows PowerShell 5.1, `Invoke-RestMethod` and `Invoke-WebRequest` throw
-  on 4xx/5xx responses, so the error body is not printed by default. To see an
-  error body, use `curl.exe`, or `Invoke-WebRequest -SkipHttpErrorCheck` in
-  PowerShell 7.
 - An invalid index ID (`bad-id`) returned Prism's generated `422` response
   with `application/problem+json`, not the contract's `ErrorResponse` shape.
 - These mock responses do not exercise the service's actual authentication,
