@@ -62,7 +62,7 @@ python -m pytest -q
 
 ## Mock server (Prism)
 
-## Requirements and startup
+### Startup and API key
 
 The mock server requires Node.js. It was tested with Node.js `v24.22.0` and
 Prism CLI `5.16.0`. From the repository root, start Prism with the pinned CLI
@@ -79,7 +79,7 @@ empty key was rejected with `401`, but the non-empty value `wrong` was accepted
 with `202`. Prism therefore does not verify the key's value; this mock behavior
 is for local development only and is not authentication.
 
-## PowerShell examples
+### PowerShell examples
 
 Run these examples in another PowerShell terminal while Prism is running:
 
@@ -99,7 +99,11 @@ $queryBody = @{ index_id = 'idx_3f9a1c'; question = 'JWT o dau?' } | ConvertTo-J
 | Read file lines 34–36 | `Invoke-RestMethod -Method Get -Uri "$baseUrl/v1/indexes/idx_3f9a1c/files?path=src%2Fflask%2Fapp.py&start=34&end=36" -Headers $headers` |
 | Query | `Invoke-RestMethod -Method Post -Uri "$baseUrl/v1/query" -Headers $headers -ContentType 'application/json' -Body $queryBody` |
 
-## Selecting response examples
+In Windows PowerShell 5.1, `Invoke-RestMethod` and `Invoke-WebRequest` throw on
+4xx/5xx responses, so the error body is not printed by default. To see an error
+body, use `curl.exe`, or `Invoke-WebRequest -SkipHttpErrorCheck` in PowerShell 7.
+
+### Selecting response examples
 
 Use the `Prefer` header to select a documented index state:
 
@@ -113,7 +117,7 @@ To select a defined error response, use `Prefer: code=<status>`. For example,
 the query operation returned `409` and `504` when requested with
 `Prefer: code=409` and `Prefer: code=504`, respectively.
 
-## Observed behavior and known limitations
+### Observed behavior and known limitations
 
 The following behavior was observed with Prism CLI `5.16.0` against this
 contract:
