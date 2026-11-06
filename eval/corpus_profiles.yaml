@@ -1,0 +1,25 @@
+version: 1
+repos:
+  fastapi/fastapi:
+    commit_sha: "79cab5bed28b24d92c185d236feb33f5783dfeb3"
+    id_prefix: "fa"
+    profiles:
+      src_only:
+        include:
+          - "fastapi/"
+          - "scripts/"
+        exclude:
+          - "tests/"
+          - "docs_src/"
+          - "docs/"
+  pallets/flask:
+    commit_sha: "d086db856be187255b8ec61ef409357393020f32"
+    id_prefix: "fl"
+    profiles:
+      src_only:
+        include:
+          - "src/flask/"
+        exclude:
+          - "tests/"
+          - "examples/"
+          - "docs/"
