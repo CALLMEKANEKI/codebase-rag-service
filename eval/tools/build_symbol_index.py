@@ -28,13 +28,20 @@ def main(argv: list[str] | None = None) -> int:
         if args.repo not in profiles:
             raise ConfigurationError(f"unknown repo in profiles: {args.repo}")
         profile = profiles[args.repo]
+        repo_root = args.repo_root.resolve()
+        if not repo_root.is_dir():
+            raise ConfigurationError(f"repo_root is not a directory: {repo_root}")
         if args.skip_sha_check:
             print("Snapshot check skipped")
         else:
-            print(verify_checkout(args.repo_root, profile.commit_sha, profile))
-        file_paths = enumerate_corpus(args.repo_root, profile)
+            print(verify_checkout(repo_root, profile.commit_sha, profile))
+        file_paths = enumerate_corpus(repo_root, profile)
+        if not file_paths:
+            raise ConfigurationError(
+                f"src_only corpus contains no Python files for {args.repo}"
+            )
         records, records_by_file, empty_files, errors = build_symbols(
-            args.repo_root, args.repo, file_paths
+            repo_root, args.repo, file_paths
         )
         if errors:
             print("Python source errors:", file=sys.stderr)

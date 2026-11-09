@@ -110,6 +110,17 @@ def make_git_repo(
     return git(root, "rev-parse", "HEAD", env=env), env
 
 
+def make_empty_corpus_git_repo(root: Path, monkeypatch) -> tuple[str, dict[str, str]]:
+    root.mkdir(parents=True, exist_ok=True)
+    env = isolated_git_env(monkeypatch)
+    git(root, "init", "-q", env=env)
+    configure_git_repo(root, env, autocrlf=False)
+    (root / "README.txt").write_text("no Python corpus\n", encoding="utf-8")
+    git(root, "add", ".", env=env)
+    git(root, "commit", "-m", "empty corpus fixture", "-q", env=env)
+    return git(root, "rev-parse", "HEAD", env=env), env
+
+
 def snapshot_bytes(root: Path) -> dict[str, bytes]:
     return {
         path.relative_to(root).as_posix(): path.read_bytes()
@@ -917,6 +928,62 @@ def test_schema_and_consistency_errors_are_reported(
     capsys.readouterr()
 
 
+@pytest.mark.parametrize("lexical_overlap", [[], {}], ids=["list", "mapping"])
+def test_validator_rejects_unhashable_lexical_overlap_without_traceback(
+    tmp_path, capsys, lexical_overlap
+):
+    root, profiles, *_ = _plain_fixture(tmp_path)
+    profile = profiles[REPO]
+    profile_path = write_profile(tmp_path / "profiles.yaml", profile.commit_sha)
+    row = _valid_record(
+        profile,
+        start_line=3,
+        end_line=5,
+    )
+    row["lexical_overlap"] = lexical_overlap
+    dataset = tmp_path / "invalid-lexical.jsonl"
+    dataset.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+    code = validate_dataset_main(
+        [
+            "--dataset",
+            str(dataset),
+            "--repo-root",
+            f"{REPO}={root}",
+            "--profiles",
+            str(profile_path),
+            "--skip-sha-check",
+        ]
+    )
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert code == 1
+    assert "lexical_overlap must be high or low" in output
+    assert "Traceback" not in output
+
+
+@pytest.mark.parametrize(
+    "question",
+    [" " * 20, f"   {'short question'[:14]}   "],
+    ids=["whitespace-only", "short-after-strip"],
+)
+def test_validator_requires_15_question_characters_after_strip(
+    tmp_path, capsys, question
+):
+    context = _plain_fixture(tmp_path)
+    row = _valid_record(context[1][REPO])
+    row["question"] = question
+
+    errors, _, _ = _run_records([row], context)
+
+    assert len(errors) == 1
+    assert (
+        "question must be a string of at least 15 characters after stripping whitespace"
+        in errors[0]
+    )
+    capsys.readouterr()
+
+
 def test_question_normalization_removes_punctuation_and_collapses_whitespace(
     tmp_path, capsys
 ):
@@ -1149,6 +1216,186 @@ def test_snapshot_failure_precedes_dataset_errors(tmp_path, monkeypatch, capsys)
     assert code == 2
     assert "MODIFIED" in output
     assert "missing required field" not in output
+
+
+def test_relative_repo_root_works_for_validator_and_symbol_index(
+    tmp_path, monkeypatch, capsys
+):
+    root = tmp_path / "repo"
+    sha, _ = make_git_repo(root, monkeypatch)
+    profile_path = write_profile(tmp_path / "profiles.yaml", sha)
+    row = _valid_record(
+        CorpusProfile(sha, "ex", ("pkg/",), ("pkg/vendor/",)),
+        start_line=1,
+        end_line=2,
+    )
+    dataset = tmp_path / "dataset.jsonl"
+    dataset.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    validator_code = validate_dataset_main(
+        [
+            "--dataset",
+            str(dataset),
+            "--repo-root",
+            f"{REPO}=repo",
+            "--profiles",
+            str(profile_path),
+        ]
+    )
+    validator_output = capsys.readouterr().out
+    assert validator_code == 0
+    assert "Snapshot OK:" in validator_output
+
+    build_code = build_index_main(
+        [
+            "--repo",
+            REPO,
+            "--repo-root",
+            "repo",
+            "--profiles",
+            str(profile_path),
+            "--out",
+            str(tmp_path / "symbols.jsonl"),
+            "--outline",
+            str(tmp_path / "outline.txt"),
+        ]
+    )
+    build_output = capsys.readouterr().out
+    assert build_code == 0
+    assert "Snapshot OK:" in build_output
+
+
+@pytest.mark.parametrize("skip_sha_check", [False, True])
+def test_build_cli_rejects_nonexistent_repo_root(tmp_path, capsys, skip_sha_check):
+    profile_path = write_profile(tmp_path / "profiles.yaml")
+    args = [
+        "--repo",
+        REPO,
+        "--repo-root",
+        str(tmp_path / "missing"),
+        "--profiles",
+        str(profile_path),
+        "--out",
+        str(tmp_path / "symbols.jsonl"),
+        "--outline",
+        str(tmp_path / "outline.txt"),
+    ]
+    if skip_sha_check:
+        args.append("--skip-sha-check")
+
+    code = build_index_main(args)
+
+    output = capsys.readouterr().err
+    assert code == 2
+    assert "repo_root is not a directory" in output
+
+
+@pytest.mark.parametrize("skip_sha_check", [False, True])
+def test_build_cli_rejects_corpus_without_python_files(
+    tmp_path, monkeypatch, capsys, skip_sha_check
+):
+    root = tmp_path / "repo"
+    sha, _ = make_empty_corpus_git_repo(root, monkeypatch)
+    profile_path = write_profile(tmp_path / "profiles.yaml", sha)
+    args = [
+        "--repo",
+        REPO,
+        "--repo-root",
+        str(root),
+        "--profiles",
+        str(profile_path),
+        "--out",
+        str(tmp_path / "symbols.jsonl"),
+        "--outline",
+        str(tmp_path / "outline.txt"),
+    ]
+    if skip_sha_check:
+        args.append("--skip-sha-check")
+
+    code = build_index_main(args)
+
+    output = capsys.readouterr().err
+    assert code == 2
+    assert "src_only corpus contains no Python files" in output
+
+
+@pytest.mark.parametrize("skip_sha_check", [False, True])
+def test_validator_rejects_corpus_without_python_files(
+    tmp_path, monkeypatch, capsys, skip_sha_check
+):
+    root = tmp_path / "empty-corpus"
+    sha, _ = make_empty_corpus_git_repo(root, monkeypatch)
+    profile_path = write_profile(tmp_path / "profiles.yaml", sha)
+    row = _valid_record(
+        CorpusProfile(sha, "ex", ("pkg/",), ("pkg/vendor/",)),
+        start_line=1,
+        end_line=2,
+    )
+    dataset = tmp_path / "dataset.jsonl"
+    dataset.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+    args = [
+        "--dataset",
+        str(dataset),
+        "--repo-root",
+        f"{REPO}={root}",
+        "--profiles",
+        str(profile_path),
+    ]
+    if skip_sha_check:
+        args.append("--skip-sha-check")
+    code = validate_dataset_main(args)
+
+    output = capsys.readouterr().err
+    assert code == 2
+    assert "src_only corpus contains no Python files" in output
+
+
+def test_empty_python_files_do_not_count_as_an_empty_corpus(tmp_path, capsys):
+    root = tmp_path / "repo"
+    (root / "pkg").mkdir(parents=True)
+    (root / "pkg/empty.py").write_bytes(b"")
+    profile_path = write_profile(tmp_path / "profiles.yaml")
+
+    build_code = build_index_main(
+        [
+            "--repo",
+            REPO,
+            "--repo-root",
+            str(root),
+            "--profiles",
+            str(profile_path),
+            "--skip-sha-check",
+            "--out",
+            str(tmp_path / "symbols.jsonl"),
+            "--outline",
+            str(tmp_path / "outline.txt"),
+        ]
+    )
+    output = capsys.readouterr().out
+    assert build_code == 0
+    assert "Corpus files: 1" in output
+    assert "Empty files: 1" in output
+
+    (root / "pkg/a.py").write_text("def alpha():\n    return 1\n", encoding="utf-8")
+    row = _valid_record(
+        CorpusProfile(PINNED_SHA, "ex", ("pkg/",), ("pkg/vendor/",)),
+        start_line=1,
+        end_line=2,
+    )
+    dataset = tmp_path / "dataset.jsonl"
+    dataset.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    validator_code = validate_dataset_file(
+        dataset,
+        {REPO: root},
+        profile_path,
+        phase="all",
+        skip_sha_check=True,
+        require_complete=False,
+    )
+    assert validator_code == 0
+    capsys.readouterr()
 
 
 def test_phase_filters_completeness_only_not_dataset_validation(tmp_path, capsys):

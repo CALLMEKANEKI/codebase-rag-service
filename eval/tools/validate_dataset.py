@@ -205,12 +205,12 @@ def _validate_record(
         _field_error(errors, line, record_id, "lexical_overlap must be high or low")
 
     question = record.get("question")
-    if not isinstance(question, str) or len(question) < 15:
+    if not isinstance(question, str) or len(question.strip()) < 15:
         _field_error(
             errors,
             line,
             record_id,
-            "question must be a string of at least 15 characters",
+            "question must be a string of at least 15 characters after stripping whitespace",
         )
     elif question.strip():
         normalized = _normalize_question(question)
@@ -653,7 +653,9 @@ def validate_records(
             continue
         question = record.get("question")
         lexical = record.get("lexical_overlap")
-        if not isinstance(question, str) or lexical not in {"high", "low"}:
+        if not isinstance(question, str) or not isinstance(lexical, str):
+            continue
+        if lexical not in ("high", "low"):
             continue
         mention = any(
             _identifier_mentions(question, name, qualname)
@@ -754,6 +756,10 @@ def validate_dataset_file(
     for repo_id in sorted(configured_repos):
         root = repo_roots[repo_id]
         file_paths = enumerate_corpus(root, profiles[repo_id])
+        if not file_paths:
+            raise ConfigurationError(
+                f"src_only corpus contains no Python files for {repo_id}"
+            )
         corpus_by_repo[repo_id] = set(file_paths)
         _records_for_repo, records_by_file, _empty, source_errors = build_symbols(
             root, repo_id, file_paths

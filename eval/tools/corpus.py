@@ -162,7 +162,7 @@ def _display_paths(paths: list[str], limit: int = 50) -> str:
 def verify_checkout(
     repo_root: str | Path, pinned_sha: str, profile: CorpusProfile
 ) -> str:
-    root = Path(repo_root)
+    root = Path(repo_root).resolve()
     if not root.is_dir():
         raise ConfigurationError(f"repo_root is not a directory: {root}")
 
