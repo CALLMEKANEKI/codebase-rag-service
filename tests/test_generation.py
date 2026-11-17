@@ -56,8 +56,14 @@ def test_citation_validator_discards_unknown_refs_and_builds_contract_shape():
     assert answer == "Found here , not ."
     assert len(citations) == 1
     assert set(citations[0]) == {
-        "ref_id", "file_path", "symbol", "symbol_kind",
-        "start_line", "end_line", "snippet", "score",
+        "ref_id",
+        "file_path",
+        "symbol",
+        "symbol_kind",
+        "start_line",
+        "end_line",
+        "snippet",
+        "score",
     }
 
 
