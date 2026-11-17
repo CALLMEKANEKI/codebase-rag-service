@@ -1,0 +1,82 @@
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+from pathlib import Path
+
+GITHUB_REPO_RE = re.compile(
+    r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+)
+DEFAULT_CLONE_TIMEOUT_SECONDS = 120
+
+
+class CloneError(RuntimeError):
+    pass
+
+
+def validate_repo_url(repo_url: str) -> str:
+    value = repo_url.strip()
+    if not GITHUB_REPO_RE.fullmatch(value):
+        raise ValueError(
+            "repo_url must be https://github.com/<owner>/<repo> without .git or trailing slash"
+        )
+    return value
+
+
+def git_output(args: list[str], *, cwd: Path | None = None, timeout: int = 15) -> str:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_LFS_SKIP_SMUDGE": "1"},
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        raise CloneError(f"git command failed: {exc}") from exc
+    return result.stdout.strip()
+
+
+def resolve_commit_sha(repo_root: str | Path) -> str:
+    root = Path(repo_root).resolve(strict=True)
+    sha = git_output(["rev-parse", "HEAD"], cwd=root)
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise CloneError("Git returned an invalid commit SHA")
+    return sha
+
+
+def clone_repository(
+    repo_url: str,
+    destination: str | Path,
+    timeout: int = DEFAULT_CLONE_TIMEOUT_SECONDS,
+) -> str:
+    url = validate_repo_url(repo_url)
+    target = Path(destination).resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() and any(target.iterdir()):
+        raise CloneError(f"Clone destination is not empty: {target}")
+    env = {
+        **os.environ,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_LFS_SKIP_SMUDGE": "1",
+    }
+    try:
+        subprocess.run(
+            [
+                "git", "clone", "--depth", "1", "--no-recurse-submodules",
+                url, str(target),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise CloneError(f"Clone timed out after {timeout} seconds") from exc
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise CloneError(f"Unable to clone repository: {exc}") from exc
+    return resolve_commit_sha(target)
