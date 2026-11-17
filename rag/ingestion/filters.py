@@ -41,9 +41,8 @@ def is_sensitive_name(name: str) -> bool:
     lowered = name.lower()
     return (
         lowered in SENSITIVE_NAMES
-        or lowered.startswith(".env.")
+        or lowered.startswith((".env.", "id_rsa", "id_ed25519"))
         or lowered.endswith(tuple(SENSITIVE_SUFFIXES))
-        or lowered.startswith(("id_rsa", "id_ed25519"))
         or "secret" in lowered and lowered.endswith((".json", ".yaml", ".yml", ".toml"))
     )
 
