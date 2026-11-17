@@ -95,3 +95,12 @@ def test_empty_retrieval_does_not_call_llm():
 
     assert llm.calls == 0
     assert result.citations == []
+
+
+
+def test_context_never_partially_truncates_citable_chunks():
+    results = [RetrievedChunk(chunk(text="x" * 500), 0.9, 1)]
+    context = build_context(results, max_chars=80)
+
+    assert context.text == ""
+    assert context.sources == ()
