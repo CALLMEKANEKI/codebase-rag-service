@@ -46,7 +46,7 @@ def test_create_index_status_and_snapshot_file_lifecycle(tmp_path, monkeypatch):
             encoding="utf-8",
         )
         (root / "snapshot" / "large.py").write_text(
-            "".join(f"line {number}\\n" for number in range(1, 2002)),
+            "".join(f"line {number}\n" for number in range(1, 2002)),
             encoding="utf-8",
         )
         (root / "manifest.json").write_text(
