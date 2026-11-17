@@ -263,9 +263,7 @@ def create_app(
     app.state.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="rag-index")
     app.state.futures: dict[str, Future] = {}
     app.state.cancel_events: dict[str, threading.Event] = {}
-    app.state.registry = IndexRegistry(
-        Path(app.state.settings.index_storage_path).parent / "index_registry.sqlite"
-    )
+    app.state.registry = IndexRegistry(app.state.settings.index_registry_path)
 
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next):
