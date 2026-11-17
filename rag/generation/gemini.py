@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import httpx
 from google import genai
 from google.genai import types
 
-from rag.generation.base import GenerationResult
+from rag.generation.base import GenerationResult, LLMError
 from rag.generation.context import SYSTEM_INSTRUCTION
 
 
@@ -33,15 +34,21 @@ class GeminiLanguageModel:
             f"Question: {question}\n\n"
             "Answer using only the excerpts and cite claims with [n] markers."
         )
-        response = self._client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
-                temperature=0.1,
-                max_output_tokens=1200,
-            ),
-        )
+        try:
+            response = self._client.models.generate_content(
+                model=self.model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_INSTRUCTION,
+                    temperature=0.1,
+                    max_output_tokens=1200,
+                ),
+            )
+        except (TimeoutError, httpx.TimeoutException):
+            raise
+        except Exception as exc:
+            raise LLMError("Gemini generation failed") from exc
+
         usage = response.usage_metadata
         return GenerationResult(
             text=(response.text or "").strip(),
