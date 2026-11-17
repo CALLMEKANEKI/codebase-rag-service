@@ -1,7 +1,11 @@
+import argparse
 import hashlib
+import json
+import subprocess
 
 import pytest
 
+from rag.cli import ingest
 from rag.ingestion.clone import validate_repo_url
 from rag.ingestion.filters import (
     FilterLimits,
@@ -109,3 +113,77 @@ def test_fixed_chunking_uses_sixty_lines_with_ten_line_overlap():
     assert [(chunk.start_line, chunk.end_line) for chunk in chunks] == [
         (1, 60), (51, 110), (101, 130)
     ]
+
+
+def test_large_class_is_split_into_header_and_methods():
+    method_a = "\n".join(f"        a_{i} = {i}" for i in range(65))
+    method_b = "\n".join(f"        b_{i} = {i}" for i in range(65))
+    source = (
+        "class Large:\n"
+        "    category = 'large'\n"
+        "    def first(self):\n"
+        f"{method_a}\n"
+        "        return a_64\n"
+        "    def second(self):\n"
+        f"{method_b}\n"
+        "        return b_64\n"
+    )
+    chunks = chunk_python_source(
+        source,
+        index_id="idx_test",
+        commit_sha="d" * 40,
+        file_path="src/large.py",
+    )
+    assert any(chunk.symbol_kind == "class" for chunk in chunks)
+    assert any(chunk.qualname == "Large.first" for chunk in chunks)
+    assert any(chunk.qualname == "Large.second" for chunk in chunks)
+    assert not any(
+        chunk.symbol_kind == "class" and chunk.end_line == len(source.splitlines())
+        for chunk in chunks
+    )
+
+
+def test_local_ingest_cli_writes_snapshot_manifest_and_chunks(tmp_path):
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    subprocess.run(["git", "-C", str(repository), "init", "-q"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.name", "RAG Test"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.email", "rag@example.invalid"],
+        check=True,
+    )
+    source_file = repository / "src" / "app.py"
+    source_file.parent.mkdir()
+    source_file.write_text("def answer():\n    return 42\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repository), "add", "."], check=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "commit", "-m", "fixture", "-q"],
+        check=True,
+    )
+
+    output = tmp_path / "index"
+    args = argparse.Namespace(
+        index_id="idx_test",
+        output=str(output),
+        local_path=str(repository),
+        repo_url=None,
+        ref=None,
+        strategy="code",
+        max_files=2_000,
+        max_file_bytes=256 * 1024,
+        max_total_bytes=50 * 1024 * 1024,
+    )
+
+    assert ingest(args) == 0
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    chunks = [
+        json.loads(line)
+        for line in (output / "chunks.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert manifest["stats"]["files"] == 1
+    assert manifest["stats"]["chunks"] == len(chunks)
+    assert manifest["commit_sha"] == chunks[0]["commit_sha"]
+    assert chunks[0]["text"] == "def answer():\n    return 42\n"
