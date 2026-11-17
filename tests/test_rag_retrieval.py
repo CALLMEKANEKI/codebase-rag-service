@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from rag.embeddings.cache import CachedEmbedder, SQLiteEmbeddingCache
