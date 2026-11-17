@@ -7,8 +7,7 @@ import threading
 from pathlib import Path
 from typing import Callable
 
-from rag.embeddings.cache import CachedEmbedder, SQLiteEmbeddingCache
-from rag.embeddings.sentence_transformer import SentenceTransformerEmbedder
+from rag.embeddings.base import Embedder
 from rag.indexing import IndexingService
 from rag.ingestion.clone import CloneError, clone_repository
 from rag.ingestion.filters import (
@@ -18,7 +17,7 @@ from rag.ingestion.filters import (
 )
 from rag.ingestion.snapshot import create_snapshot
 from rag.parsing.chunking import CHUNKER_VERSION, chunk_python_bytes
-from rag.vectorstore.qdrant_store import QdrantVectorStore
+from rag.vectorstore.base import VectorStore
 
 MAX_CHUNKS = 20_000
 
@@ -33,10 +32,8 @@ def run_indexing(
     repo_url: str,
     ref: str | None,
     index_root: Path,
-    embedding_model: str,
-    embedding_device: str,
-    cache_path: Path,
-    qdrant_path: Path,
+    embedder: Embedder,
+    store: VectorStore,
     update_status: Callable[..., None],
     cancelled: threading.Event,
 ) -> None:
@@ -101,26 +98,13 @@ def run_indexing(
             check_cancelled()
             update_status(status="embedding", stage="embedding")
 
-        embedder_base = SentenceTransformerEmbedder(
-            model_name=embedding_model,
-            device=embedding_device,
+        check_cancelled()
+        if not chunks:
+            raise ValueError("Repository contains no indexable Python chunks")
+        IndexingService(embedder, store).index_jsonl(
+            index_id, index_root / "chunks.jsonl", batch_size=32
         )
-        cache = SQLiteEmbeddingCache(
-            cache_path,
-            chunker_version=CHUNKER_VERSION,
-            header_enabled=False,
-        )
-        store = QdrantVectorStore(path=qdrant_path)
-        try:
-            check_cancelled()
-            embedder = CachedEmbedder(embedder_base, cache)
-            IndexingService(embedder, store).index_jsonl(
-                index_id, index_root / "chunks.jsonl", batch_size=32
-            )
-            check_cancelled()
-        finally:
-            store.close()
-            cache.close()
+        check_cancelled()
 
         update_status(
             status="ready",
