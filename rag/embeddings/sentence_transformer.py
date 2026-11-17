@@ -39,7 +39,9 @@ class SentenceTransformerEmbedder:
         )
         dimension = self._model.get_sentence_embedding_dimension()
         if dimension is None:
-            raise RuntimeError(f"Model does not expose an embedding dimension: {model_name}")
+            raise RuntimeError(
+                f"Model does not expose an embedding dimension: {model_name}"
+            )
         self._dim = int(dimension)
 
     @property
