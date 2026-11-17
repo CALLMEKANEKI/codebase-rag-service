@@ -98,7 +98,6 @@ def ingest(args: argparse.Namespace) -> int:
     return 0
 
 
-
 def _embedding_runtime(args):
     base_embedder = SentenceTransformerEmbedder(
         model_name=args.model,
