@@ -168,7 +168,7 @@ def create_app(
                 {"field": "options"},
             )
 
-        index_root = Path(request.app.state.settings.index_storage_path) / payload.index_id
+        index_root = (\n            Path(request.app.state.settings.index_storage_path) / payload.index_id\n        )
         manifest_path = index_root / "manifest.json"
         if not manifest_path.is_file():
             raise APIError(
