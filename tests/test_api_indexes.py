@@ -50,7 +50,12 @@ def test_create_index_status_and_snapshot_file_lifecycle(tmp_path, monkeypatch):
             encoding="utf-8",
         )
         (root / "manifest.json").write_text(
-            json.dumps({"files": [{"path": "src/app.py"}, {"path": "large.py"}], "stats": {"files": 2, "chunks": 2}}),
+            json.dumps(
+                {
+                    "files": [{"path": "src/app.py"}, {"path": "large.py"}],
+                    "stats": {"files": 2, "chunks": 2},
+                }
+            ),
             encoding="utf-8",
         )
         kwargs["update_status"](
@@ -142,9 +147,12 @@ def test_create_index_status_and_snapshot_file_lifecycle(tmp_path, monkeypatch):
             f"/v1/indexes/{index_id}", headers={"X-API-Key": "test-key"}
         )
         assert missing.status_code == 404
-        assert client.delete(
-            f"/v1/indexes/{index_id}", headers={"X-API-Key": "test-key"}
-        ).status_code == 204
+        assert (
+            client.delete(
+                f"/v1/indexes/{index_id}", headers={"X-API-Key": "test-key"}
+            ).status_code
+            == 204
+        )
 
 
 def test_index_endpoints_require_api_key_and_reject_invalid_repo(tmp_path):
@@ -152,7 +160,7 @@ def test_index_endpoints_require_api_key_and_reject_invalid_repo(tmp_path):
         settings=Settings(
             rag_api_key="test-key",
             index_storage_path=tmp_path / "indexes",
-        index_registry_path=tmp_path / "index_registry.sqlite",
+            index_registry_path=tmp_path / "index_registry.sqlite",
         )
     )
     with TestClient(app) as client:
