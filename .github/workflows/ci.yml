@@ -82,3 +82,11 @@ jobs:
             --repo-root "pallets/flask=benchmark-repos/flask" \
             --phase test \
             --require-complete
+
+      - name: Run real Flask ingestion smoke test
+        run: |
+          python -m rag.cli ingest \
+            --local-path benchmark-repos/flask \
+            --index-id idx_flask_ci \
+            --output "$RUNNER_TEMP/rag-index-flask"
+          python -c "import json, pathlib; root=pathlib.Path('$RUNNER_TEMP/rag-index-flask'); manifest=json.loads((root/'manifest.json').read_text()); chunks=[json.loads(line) for line in (root/'chunks.jsonl').read_text().splitlines()]; assert manifest['commit_sha']=='d086db856be187255b8ec61ef409357393020f32'; assert manifest['stats']['files'] > 0; assert chunks; assert any('dispatch_request' in chunk['text'] for chunk in chunks); print('Flask ingestion smoke: files=', manifest['stats']['files'], 'chunks=', len(chunks))"
