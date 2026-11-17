@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 from rag.config import Settings, get_settings
 from rag.embeddings.cache import CachedEmbedder, SQLiteEmbeddingCache
 from rag.embeddings.sentence_transformer import SentenceTransformerEmbedder
+from rag.generation.base import LLMError
 from rag.generation.gemini import GeminiLanguageModel
 from rag.generation.service import QueryService
 from rag.parsing.chunking import CHUNKER_VERSION
@@ -207,9 +208,7 @@ def create_app(
             )
         except (TimeoutError, httpx.TimeoutException) as exc:
             raise APIError(504, "TIMEOUT", "The request timed out") from exc
-        except APIError:
-            raise
-        except Exception as exc:
+        except LLMError as exc:
             raise APIError(
                 502, "LLM_ERROR", "The language model request failed"
             ) from exc
