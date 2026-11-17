@@ -29,7 +29,9 @@ def create_snapshot(
     source = Path(source_root).resolve(strict=True)
     destination = Path(index_root).resolve()
     if source == destination or source in destination.parents:
-        raise ValueError("Snapshot destination must not be inside the source repository")
+        raise ValueError(
+            "Snapshot destination must not be inside the source repository"
+        )
     if destination.exists() and any(destination.iterdir()):
         raise FileExistsError(f"Index directory is not empty: {destination}")
     report = report or enumerate_python_files(source)
@@ -48,11 +50,13 @@ def create_snapshot(
         target = snapshot_root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source_file, target)
-        entries.append({
-            "path": relative,
-            "size_bytes": target.stat().st_size,
-            "sha256": sha256_file(target),
-        })
+        entries.append(
+            {
+                "path": relative,
+                "size_bytes": target.stat().st_size,
+                "sha256": sha256_file(target),
+            }
+        )
 
     manifest = {
         "version": 1,
