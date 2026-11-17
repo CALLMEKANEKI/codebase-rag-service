@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import time
+
+import httpx
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -178,7 +180,7 @@ def create_app(
                 top_k=payload.top_k,
                 debug=payload.debug,
             )
-        except TimeoutError as exc:
+        except (TimeoutError, httpx.TimeoutException) as exc:
             raise APIError(504, "TIMEOUT", "The request timed out") from exc
         except APIError:
             raise
