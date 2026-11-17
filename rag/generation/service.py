@@ -18,7 +18,9 @@ class QueryResult:
 
 
 class QueryService:
-    def __init__(\n        self, retriever: DenseRetriever, language_model: LanguageModel\n    ) -> None:
+    def __init__(
+        self, retriever: DenseRetriever, language_model: LanguageModel
+    ) -> None:
         self.retriever = retriever
         self.language_model = language_model
 
@@ -40,7 +42,10 @@ class QueryService:
                 debug={"mode": "dense", "retrieved": []} if debug else None,
             )
 
-        generated = self.language_model.generate(\n            question=question, context=context.text\n        )
+        generated = self.language_model.generate(
+            question=question,
+            context=context.text,
+        )
         answer, citations = validate_citations(generated.text, context.sources)
         usage = None
         if generated.input_tokens is not None or generated.output_tokens is not None:
@@ -57,10 +62,17 @@ class QueryService:
                     {
                         "chunk_id": str(item.chunk.get("chunk_id") or ""),
                         "file_path": str(item.chunk.get("file_path") or ""),
-                        "symbol": item.chunk.get("qualname")\n                        or item.chunk.get("symbol_name"),
+                        "symbol": (
+                            item.chunk.get("qualname")
+                            or item.chunk.get("symbol_name")
+                        ),
                         "symbol_kind": item.chunk.get("symbol_kind"),
                         "start_line": int(item.chunk.get("start_line") or 1),
-                        "end_line": int(\n                            item.chunk.get("end_line")\n                            or item.chunk.get("start_line")\n                            or 1\n                        ),
+                        "end_line": int(
+                            item.chunk.get("end_line")
+                            or item.chunk.get("start_line")
+                            or 1
+                        ),
                         "score": float(item.score),
                         "used_in_context": id(item.chunk) in included_chunk_ids,
                     }
