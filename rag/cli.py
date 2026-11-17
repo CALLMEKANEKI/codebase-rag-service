@@ -7,11 +7,11 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from rag.ingestion.clone import clone_repository, resolve_commit_sha
-from rag.ingestion.filters import FilterLimits, enumerate_python_files
 from rag.embeddings.cache import CachedEmbedder, SQLiteEmbeddingCache
 from rag.embeddings.sentence_transformer import SentenceTransformerEmbedder
 from rag.indexing import IndexingService
+from rag.ingestion.clone import clone_repository, resolve_commit_sha
+from rag.ingestion.filters import FilterLimits, enumerate_python_files
 from rag.ingestion.snapshot import create_snapshot
 from rag.parsing.chunking import CHUNKER_VERSION, chunk_python_bytes
 from rag.retrieval.dense import DenseRetriever
