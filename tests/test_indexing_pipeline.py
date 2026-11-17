@@ -1,5 +1,5 @@
-from pathlib import Path
 import threading
+from pathlib import Path
 
 from rag.indexing_pipeline import IndexCancelled, run_indexing
 
