@@ -30,6 +30,7 @@ def make_client(tmp_path):
     settings = Settings(
         rag_api_key="test-key",
         index_storage_path=tmp_path / "indexes",
+        index_registry_path=tmp_path / "index_registry.sqlite",
     )
     index_root = tmp_path / "indexes" / "idx_demo"
     index_root.mkdir(parents=True)
