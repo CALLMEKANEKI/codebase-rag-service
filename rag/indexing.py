@@ -46,9 +46,7 @@ class IndexingService:
         batches = 0
         for offset in range(0, len(chunks), batch_size):
             batch = chunks[offset : offset + batch_size]
-            vectors = self.embedder.embed_documents(
-                [chunk["text"] for chunk in batch]
-            )
+            vectors = self.embedder.embed_documents([chunk["text"] for chunk in batch])
             if len(vectors) != len(batch):
                 raise ValueError("Embedder returned an unexpected number of vectors")
             if any(len(vector) != self.embedder.dim for vector in vectors):
