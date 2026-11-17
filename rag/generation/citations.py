@@ -6,9 +6,7 @@ from typing import Any
 from rag.generation.context import ContextSource
 
 _MARKER = re.compile(r"\[(\d+)\]")
-_NO_EVIDENCE_ANSWER = (
-    "I could not find enough evidence in the indexed repository to answer that question."
-)
+_NO_EVIDENCE_ANSWER = "I could not find enough evidence in the indexed repository to answer that question."
 
 
 def validate_citations(
