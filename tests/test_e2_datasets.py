@@ -69,7 +69,9 @@ def test_test_unanswerables_are_not_yes_no_questions():
 
 
 def test_reviewed_test_ground_truth_ranges_and_lexical_labels_are_updated():
-    test = {row["id"]: row for row in read_jsonl(DATASETS / "test" / "E2_Test_48.jsonl")}
+    test = {
+        row["id"]: row for row in read_jsonl(DATASETS / "test" / "E2_Test_48.jsonl")
+    }
 
     encoder = test["fa-und-003"]["relevant"][0]
     assert (encoder["start_line"], encoder["end_line"]) == (243, 258)
