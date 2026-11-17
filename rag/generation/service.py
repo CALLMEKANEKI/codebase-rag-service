@@ -63,8 +63,7 @@ class QueryService:
                         "chunk_id": str(item.chunk.get("chunk_id") or ""),
                         "file_path": str(item.chunk.get("file_path") or ""),
                         "symbol": (
-                            item.chunk.get("qualname")
-                            or item.chunk.get("symbol_name")
+                            item.chunk.get("qualname") or item.chunk.get("symbol_name")
                         ),
                         "symbol_kind": item.chunk.get("symbol_kind"),
                         "start_line": int(item.chunk.get("start_line") or 1),
