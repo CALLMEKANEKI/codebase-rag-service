@@ -36,16 +36,13 @@ def build_context(results: list[Any], *, max_chars: int = 48_000) -> BuiltContex
         if symbol:
             header += f" ({symbol})"
         block = f"{header}\n{body.strip()}"
-        remaining = max_chars - used
-        if remaining <= 0:
+        separator_size = 2 if blocks else 0
+        remaining = max_chars - used - separator_size
+        if remaining <= 0 or len(block) > remaining:
             break
-        if len(block) > remaining:
-            if remaining < len(header) + 32:
-                break
-            block = block[:remaining]
         blocks.append(block)
         sources.append(ContextSource(ref_id, chunk, float(result.score)))
-        used += len(block) + 2
+        used += len(block) + separator_size
     return BuiltContext("\n\n".join(blocks), tuple(sources))
 
 
