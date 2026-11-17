@@ -74,8 +74,15 @@ class IndexRegistry:
 
     def update(self, index_id: str, **values: Any) -> None:
         allowed = {
-            "status", "stage", "files_done", "total_files", "commit_sha",
-            "files", "chunks", "error_code", "error_message",
+            "status",
+            "stage",
+            "files_done",
+            "total_files",
+            "commit_sha",
+            "files",
+            "chunks",
+            "error_code",
+            "error_message",
         }
         fields = {key: value for key, value in values.items() if key in allowed}
         if not fields:
@@ -121,7 +128,11 @@ class IndexRegistry:
     @staticmethod
     def to_api(row: dict[str, Any]) -> dict[str, Any]:
         status = row["status"]
-        stage = row["stage"] if status in {"cloning", "parsing", "embedding", "failed"} else None
+        stage = (
+            row["stage"]
+            if status in {"cloning", "parsing", "embedding", "failed"}
+            else None
+        )
         progress = None
         if row["total_files"] is not None:
             progress = {
@@ -130,7 +141,10 @@ class IndexRegistry:
             }
         stats = None
         if status == "ready":
-            stats = {"files": int(row["files"] or 0), "chunks": int(row["chunks"] or 0)}
+            stats = {
+                "files": int(row["files"] or 0),
+                "chunks": int(row["chunks"] or 0),
+            }
         error = None
         if status == "failed":
             error = {
