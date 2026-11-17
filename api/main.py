@@ -200,7 +200,7 @@ def _read_snapshot_file(
     except (OSError, ValueError, UnicodeDecodeError) as exc:
         raise APIError(404, "FILE_NOT_FOUND", "File not found in index snapshot", {"path": relative_path}) from exc
 
-    lines = content.splitlines()
+    lines = content.splitlines(keepends=True)
     total = len(lines)
     if start > total or (end is not None and start > end):
         raise APIError(
