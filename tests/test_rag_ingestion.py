@@ -98,7 +98,13 @@ def test_long_function_uses_overlapping_windows_and_stable_ids():
     assert len(windows) >= 3
     assert windows[0].end_line - windows[1].start_line + 1 == 10
     assert [chunk.chunk_id for chunk in first] == [chunk.chunk_id for chunk in second]
-    assert all(chunk.text == "".join(source.splitlines(keepends=True)[chunk.start_line - 1:chunk.end_line]) for chunk in first)
+    assert all(
+        chunk.text
+        == "".join(
+            source.splitlines(keepends=True)[chunk.start_line - 1 : chunk.end_line]
+        )
+        for chunk in first
+    )
 
 
 def test_fixed_chunking_uses_sixty_lines_with_ten_line_overlap():
@@ -111,7 +117,9 @@ def test_fixed_chunking_uses_sixty_lines_with_ten_line_overlap():
         strategy="fixed",
     )
     assert [(chunk.start_line, chunk.end_line) for chunk in chunks] == [
-        (1, 60), (51, 110), (101, 130)
+        (1, 60),
+        (51, 110),
+        (101, 130),
     ]
 
 
