@@ -56,9 +56,7 @@ def test_sqlite_cache_reuses_embeddings_and_is_configuration_sensitive(tmp_path)
     assert base.calls == 1
     assert embedder.embed_query("alpha") == first[0]
     assert base.calls == 1
-    assert cache.make_key(base, "alpha") != cache.make_key(
-        base, "alpha "
-    )
+    assert cache.make_key(base, "alpha") != cache.make_key(base, "alpha ")
 
     cache.close()
 
