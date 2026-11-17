@@ -71,6 +71,7 @@ def test_create_index_status_and_snapshot_file_lifecycle(tmp_path, monkeypatch):
     settings = Settings(
         rag_api_key="test-key",
         index_storage_path=tmp_path / "indexes",
+        index_registry_path=tmp_path / "index_registry.sqlite",
     )
     app = create_app(settings=settings)
 
@@ -151,6 +152,7 @@ def test_index_endpoints_require_api_key_and_reject_invalid_repo(tmp_path):
         settings=Settings(
             rag_api_key="test-key",
             index_storage_path=tmp_path / "indexes",
+        index_registry_path=tmp_path / "index_registry.sqlite",
         )
     )
     with TestClient(app) as client:
