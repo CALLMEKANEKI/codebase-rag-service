@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import time
-
-import httpx
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import Depends, FastAPI, Header, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -24,7 +23,13 @@ from rag.vectorstore.qdrant_store import QdrantVectorStore
 
 
 class APIError(Exception):
-    def __init__(self, status_code: int, code: str, message: str, details: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        status_code: int,
+        code: str,
+        message: str,
+        details: dict[str, Any] | None = None,
+    ):
         self.status_code = status_code
         self.code = code
         self.message = message
@@ -52,7 +57,9 @@ class QueryRequest(BaseModel):
         return value
 
 
-def _error(code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
+def _error(
+    code: str, message: str, details: dict[str, Any] | None = None
+) -> dict[str, Any]:
     return {"error": {"code": code, "message": message, "details": details or {}}}
 
 
@@ -130,10 +137,14 @@ def create_app(
         field = str(location[-1]) if location else "request"
         return JSONResponse(
             status_code=422,
-            content=_error("INVALID_REQUEST", "Validation failed", {
-                "field": field,
-                "reason": str(first.get("msg", "invalid value")),
-            }),
+            content=_error(
+                "INVALID_REQUEST",
+                "Validation failed",
+                {
+                    "field": field,
+                    "reason": str(first.get("msg", "invalid value")),
+                },
+            ),
         )
 
     @app.exception_handler(Exception)
@@ -160,16 +171,32 @@ def create_app(
         index_root = Path(request.app.state.settings.index_storage_path) / payload.index_id
         manifest_path = index_root / "manifest.json"
         if not manifest_path.is_file():
-            raise APIError(404, "INDEX_NOT_FOUND", "Index not found", {"index_id": payload.index_id})
+            raise APIError(
+                404,
+                "INDEX_NOT_FOUND",
+                "Index not found",
+                {"index_id": payload.index_id},
+            )
 
         service = request.app.state.query_service
         if service is None:
-            service, store, cache, model = _build_query_service(request.app.state.settings)
+            service, store, cache, model = _build_query_service(
+                request.app.state.settings
+            )
             request.app.state.query_service = service
             request.app.state.resources = (store, cache, model)
-        store = request.app.state.resources[0] if request.app.state.resources else None
+        store = (
+            request.app.state.resources[0]
+            if request.app.state.resources
+            else None
+        )
         if store is not None and not store.collection_exists(payload.index_id):
-            raise APIError(409, "INDEX_NOT_READY", "Index is not ready", {"status": "embedding"})
+            raise APIError(
+                409,
+                "INDEX_NOT_READY",
+                "Index is not ready",
+                {"status": "embedding"},
+            )
 
         started = time.perf_counter()
         try:
@@ -185,7 +212,9 @@ def create_app(
         except APIError:
             raise
         except Exception as exc:
-            raise APIError(502, "LLM_ERROR", "The language model request failed") from exc
+            raise APIError(
+                502, "LLM_ERROR", "The language model request failed"
+            ) from exc
 
         return {
             "answer": result.answer,
