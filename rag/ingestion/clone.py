@@ -52,6 +52,7 @@ def clone_repository(
     repo_url: str,
     destination: str | Path,
     timeout: int = DEFAULT_CLONE_TIMEOUT_SECONDS,
+    ref: str | None = None,
 ) -> str:
     url = validate_repo_url(repo_url)
     target = Path(destination).resolve()
@@ -79,4 +80,28 @@ def clone_repository(
         raise CloneError(f"Clone timed out after {timeout} seconds") from exc
     except (OSError, subprocess.CalledProcessError) as exc:
         raise CloneError(f"Unable to clone repository: {exc}") from exc
+    if ref:
+        try:
+            subprocess.run(
+                ["git", "fetch", "--depth", "1", "origin", ref],
+                cwd=target,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=env,
+            )
+            subprocess.run(
+                ["git", "checkout", "--detach", "FETCH_HEAD"],
+                cwd=target,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=env,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise CloneError(f"Fetching ref timed out after {timeout} seconds") from exc
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise CloneError(f"Unable to checkout requested ref: {exc}") from exc
     return resolve_commit_sha(target)
