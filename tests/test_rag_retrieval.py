@@ -125,7 +125,6 @@ def test_embedding_cache_persists_between_instances(tmp_path):
     second_cache.close()
 
 
-
 def test_indexing_service_reads_chunks_jsonl_and_builds_dense_index(tmp_path):
     chunks_path = tmp_path / "chunks.jsonl"
     chunks = [
