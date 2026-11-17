@@ -46,8 +46,12 @@ def test_create_index_status_and_snapshot_file_lifecycle(tmp_path, monkeypatch):
             "def first():\n    return 1\n\ndef second():\n    return 2\n",
             encoding="utf-8",
         )
+        (root / "snapshot" / "large.py").write_text(
+            "".join(f"line {number}\\n" for number in range(1, 2002)),
+            encoding="utf-8",
+        )
         (root / "manifest.json").write_text(
-            json.dumps({"files": [{"path": "src/app.py"}], "stats": {"files": 1, "chunks": 2}}),
+            json.dumps({"files": [{"path": "src/app.py"}, {"path": "large.py"}], "stats": {"files": 2, "chunks": 2}}),
             encoding="utf-8",
         )
         kwargs["update_status"](
@@ -124,7 +128,7 @@ def test_create_index_status_and_snapshot_file_lifecycle(tmp_path, monkeypatch):
         invalid_range = client.get(
             f"/v1/indexes/{index_id}/files",
             headers={"X-API-Key": "test-key"},
-            params={"path": "src/app.py", "start": 1, "end": 2001},
+            params={"path": "large.py", "start": 1, "end": 2001},
         )
         assert invalid_range.status_code == 400
         assert invalid_range.json()["error"]["code"] == "INVALID_RANGE"
