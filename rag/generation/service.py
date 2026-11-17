@@ -50,7 +50,7 @@ class QueryService:
             }
         debug_info = None
         if debug:
-            used = {citation["ref_id"] for citation in citations}
+            included_chunk_ids = {id(source.chunk) for source in context.sources}
             debug_info = {
                 "mode": "dense",
                 "retrieved": [
@@ -62,10 +62,7 @@ class QueryService:
                         "start_line": int(item.chunk.get("start_line") or 1),
                         "end_line": int(item.chunk.get("end_line") or item.chunk.get("start_line") or 1),
                         "score": float(item.score),
-                        "used_in_context": any(
-                            source.chunk is item.chunk and source.ref_id in used
-                            for source in context.sources
-                        ),
+                        "used_in_context": id(item.chunk) in included_chunk_ids,
                     }
                     for item in retrieved
                 ],
