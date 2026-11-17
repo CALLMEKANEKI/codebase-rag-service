@@ -9,7 +9,12 @@ development tooling for the planned service.
 - OpenAPI contract v0.2 is available in `contracts/openapi.yaml`.
 - A Prism mock server is available for local API integration.
 - An embedding benchmark script is available in `scripts/benchmark_embeddings.py`.
-- The actual API and RAG pipeline are not implemented yet.
+- WP2 baseline is implemented: public GitHub clone/snapshot, Python source filtering,
+  shared AST parsing, code-aware chunking, and a local ingestion CLI.
+- WP3 baseline is implemented: SentenceTransformer / Fake embedders, SQLite
+  embedding cache, local Qdrant vector store, and dense retrieval CLI.
+- FastAPI integration, Gemini generation, citation validation, index registry /
+  job lifecycle, and the end-to-end API pipeline are still pending.
 
 The source of truth for the API contract is `contracts/openapi.yaml`.
 
@@ -49,6 +54,56 @@ python -m pip install -r requirements-ml.txt
 The GPU requirements use the CUDA 13.2 PyTorch wheel index. This configuration
 matches the command previously used on a laptop, but has not been verified on
 the current machine because CUDA is unavailable.
+
+
+## Local RAG CLI (development baseline)
+
+The CLI currently runs ingestion, embedding/indexing, and dense retrieval as
+separate steps. It does not start the FastAPI service.
+
+### 1. Ingest a repository
+
+Use a local Git checkout:
+
+\`\`\`powershell
+python -m rag.cli ingest --local-path "C:\GitHub\flask" --index-id idx_flask
+\`\`\`
+
+Or clone a public GitHub repository (optionally at a branch, tag, or commit):
+
+\`\`\`powershell
+python -m rag.cli ingest --repo-url https://github.com/pallets/flask --ref d086db856be187255b8ec61ef409357393020f32 --index-id idx_flask
+\`\`\`
+
+The command writes a source snapshot and \`manifest.json\` under
+\`storage/indexes/<index_id>/\`, plus \`chunks.jsonl\` containing code-aware chunks.
+The current baseline indexes Python files only and applies the configured file,
+size, sensitive-name, and directory exclusions.
+
+### 2. Embed chunks and write to local Qdrant
+
+Install the selected CPU or GPU PyTorch runtime and \`requirements-ml.txt\` first.
+The first run downloads the configured model if it is not already cached.
+
+\`\`\`powershell
+python -m rag.cli index --index-id idx_flask --chunks-path storage/indexes/idx_flask/chunks.jsonl
+\`\`\`
+
+The default model is \`sentence-transformers/all-MiniLM-L6-v2\`. Override it with
+\`--model\` or \`EMBEDDING_MODEL\`; choose \`auto\`, \`cpu\`, or \`cuda\` with \`--device\`
+or \`EMBEDDING_DEVICE\`. Qdrant uses its local persistent mode, so Docker is not
+required. Vector data is stored under \`storage/qdrant\`; embedding cache data is
+stored in \`storage/embedding_cache.sqlite\`.
+
+### 3. Run dense retrieval
+
+\`\`\`powershell
+python -m rag.cli retrieve --index-id idx_flask --query "How does Flask dispatch a request?" --top-k 5
+\`\`\`
+
+The command returns ranked chunks with scores, file paths, line ranges, symbols,
+and source text. The deterministic \`FakeEmbedder\` is used in tests and CI; it is
+not a substitute for semantic embeddings in actual retrieval.
 
 ## Checks
 
