@@ -193,7 +193,12 @@ def _read_snapshot_file(
     if relative.is_absolute() or any(
         part in {"", ".", ".."} for part in relative.parts
     ):
-        raise APIError(404, "FILE_NOT_FOUND", "File not found in index snapshot", {"path": relative_path})
+        raise APIError(
+            404,
+            "FILE_NOT_FOUND",
+            "File not found in index snapshot",
+            {"path": relative_path},
+        )
 
     manifest_path = index_root / "manifest.json"
     try:
@@ -203,7 +208,12 @@ def _read_snapshot_file(
     allowed = {item.get("path") for item in manifest.get("files", [])}
     normalized = relative.as_posix()
     if normalized not in allowed:
-        raise APIError(404, "FILE_NOT_FOUND", "File not found in index snapshot", {"path": relative_path})
+        raise APIError(
+            404,
+            "FILE_NOT_FOUND",
+            "File not found in index snapshot",
+            {"path": relative_path},
+        )
 
     snapshot_root = (index_root / "snapshot").resolve()
     file_path = index_root / "snapshot" / Path(*relative.parts)
@@ -219,7 +229,12 @@ def _read_snapshot_file(
             raise FileNotFoundError
         content = resolved.read_text(encoding="utf-8")
     except (OSError, ValueError, UnicodeDecodeError) as exc:
-        raise APIError(404, "FILE_NOT_FOUND", "File not found in index snapshot", {"path": relative_path}) from exc
+        raise APIError(
+            404,
+            "FILE_NOT_FOUND",
+            "File not found in index snapshot",
+            {"path": relative_path},
+        ) from exc
 
     lines = content.splitlines(keepends=True)
     total = len(lines)
@@ -367,7 +382,9 @@ def create_app(
             )
         row = request.app.state.registry.get(index_id)
         if row is None:
-            raise APIError(404, "INDEX_NOT_FOUND", "Index not found", {"index_id": index_id})
+            raise APIError(
+                404, "INDEX_NOT_FOUND", "Index not found", {"index_id": index_id}
+            )
         return request.app.state.registry.to_api(row)
 
     @app.delete(
@@ -409,7 +426,9 @@ def create_app(
     ):
         row = request.app.state.registry.get(index_id)
         if row is None:
-            raise APIError(404, "INDEX_NOT_FOUND", "Index not found", {"index_id": index_id})
+            raise APIError(
+                404, "INDEX_NOT_FOUND", "Index not found", {"index_id": index_id}
+            )
         if row["status"] != "ready":
             raise APIError(
                 409,
