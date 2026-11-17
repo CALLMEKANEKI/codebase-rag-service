@@ -73,6 +73,18 @@ class CreateIndexRequest(BaseModel):
     ref: str | None = Field(default=None, min_length=1, max_length=255)
     client_ref: str | None = Field(default=None, max_length=200)
 
+    @field_validator("ref")
+    @classmethod
+    def ref_must_be_a_git_reference(cls, value: str | None) -> str | None:
+        if value is not None:
+            normalized = value.strip()
+            if not normalized or normalized.startswith("-") or any(
+                character.isspace() for character in normalized
+            ):
+                raise ValueError("ref must be a valid branch, tag, or commit reference")
+            return normalized
+        return value
+
 
 def _error(
     code: str, message: str, details: dict[str, Any] | None = None
