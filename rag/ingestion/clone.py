@@ -15,7 +15,7 @@ class CloneError(RuntimeError):
 
 def validate_repo_url(repo_url: str) -> str:
     value = repo_url.strip()
-    if not GITHUB_REPO_RE.fullmatch(value):
+    if not GITHUB_REPO_RE.fullmatch(value) or value.endswith(".git"):
         raise ValueError(
             "repo_url must be https://github.com/<owner>/<repo> without .git or trailing slash"
         )
