@@ -5,12 +5,28 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 EXCLUDED_DIRS = {
-    ".git", ".hg", ".svn", ".venv", "venv", "__pycache__", "node_modules",
-    "vendor", "tests", "test", "docs", "examples", "docs_src",
+    ".git",
+    ".hg",
+    ".svn",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "node_modules",
+    "vendor",
+    "tests",
+    "test",
+    "docs",
+    "examples",
+    "docs_src",
 }
 SENSITIVE_NAMES = {
-    ".env", ".env.local", ".env.production", "id_rsa", "id_ed25519",
-    "credentials.json", "secrets.json",
+    ".env",
+    ".env.local",
+    ".env.production",
+    "id_rsa",
+    "id_ed25519",
+    "credentials.json",
+    "secrets.json",
 }
 SENSITIVE_SUFFIXES = {".pem", ".key", ".p12", ".pfx", ".keystore"}
 
@@ -43,7 +59,8 @@ def is_sensitive_name(name: str) -> bool:
         lowered in SENSITIVE_NAMES
         or lowered.startswith((".env.", "id_rsa", "id_ed25519"))
         or lowered.endswith(tuple(SENSITIVE_SUFFIXES))
-        or "secret" in lowered and lowered.endswith((".json", ".yaml", ".yml", ".toml"))
+        or "secret" in lowered
+        and lowered.endswith((".json", ".yaml", ".yml", ".toml"))
     )
 
 
@@ -60,9 +77,9 @@ def enumerate_python_files(
     for current, dirs, names in os.walk(root, topdown=True, followlinks=False):
         current_path = Path(current)
         dirs[:] = sorted(
-            name for name in dirs
-            if name not in EXCLUDED_DIRS
-            and not (current_path / name).is_symlink()
+            name
+            for name in dirs
+            if name not in EXCLUDED_DIRS and not (current_path / name).is_symlink()
         )
         for name in sorted(names):
             path = current_path / name
