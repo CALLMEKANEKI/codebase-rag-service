@@ -78,8 +78,10 @@ class CreateIndexRequest(BaseModel):
     def ref_must_be_a_git_reference(cls, value: str | None) -> str | None:
         if value is not None:
             normalized = value.strip()
-            if not normalized or normalized.startswith("-") or any(
-                character.isspace() for character in normalized
+            if (
+                not normalized
+                or normalized.startswith("-")
+                or any(character.isspace() for character in normalized)
             ):
                 raise ValueError("ref must be a valid branch, tag, or commit reference")
             return normalized
@@ -181,9 +183,16 @@ def _read_snapshot_file(
     index_root: Path, relative_path: str, start: int, end: int | None
 ) -> dict[str, Any]:
     if not relative_path or "\\" in relative_path:
-        raise APIError(404, "FILE_NOT_FOUND", "File not found in index snapshot", {"path": relative_path})
+        raise APIError(
+            404,
+            "FILE_NOT_FOUND",
+            "File not found in index snapshot",
+            {"path": relative_path},
+        )
     relative = PurePosixPath(relative_path)
-    if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
+    if relative.is_absolute() or any(
+        part in {"", ".", ".."} for part in relative.parts
+    ):
         raise APIError(404, "FILE_NOT_FOUND", "File not found in index snapshot", {"path": relative_path})
 
     manifest_path = index_root / "manifest.json"
@@ -272,7 +281,9 @@ def create_app(
     app.state.embedding_runtime = None
     app.state.runtime_lock = threading.RLock()
     app.state.resources = []
-    app.state.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="rag-index")
+    app.state.executor = ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix="rag-index"
+    )
     app.state.futures: dict[str, Future] = {}
     app.state.cancel_events: dict[str, threading.Event] = {}
     app.state.registry = IndexRegistry(app.state.settings.index_registry_path)
@@ -351,7 +362,9 @@ def create_app(
     )
     async def get_index(index_id: str, request: Request):
         if not re.fullmatch(r"idx_[A-Za-z0-9_-]+", index_id):
-            raise APIError(404, "INDEX_NOT_FOUND", "Index not found", {"index_id": index_id})
+            raise APIError(
+                404, "INDEX_NOT_FOUND", "Index not found", {"index_id": index_id}
+            )
         row = request.app.state.registry.get(index_id)
         if row is None:
             raise APIError(404, "INDEX_NOT_FOUND", "Index not found", {"index_id": index_id})
@@ -428,7 +441,9 @@ def create_app(
                 {"field": "options"},
             )
 
-        index_root = Path(request.app.state.settings.index_storage_path) / payload.index_id
+        index_root = (
+            Path(request.app.state.settings.index_storage_path) / payload.index_id
+        )
         row = request.app.state.registry.get(payload.index_id)
         if row is not None and row["status"] != "ready":
             raise APIError(
