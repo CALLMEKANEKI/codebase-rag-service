@@ -29,3 +29,56 @@ jobs:
         run: ruff format --check .
       - name: Test
         run: pytest -q
+
+
+  dataset-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Install development dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Checkout pinned FastAPI corpus
+        uses: actions/checkout@v4
+        with:
+          repository: fastapi/fastapi
+          ref: 79cab5bed28b24d92c185d236feb33f5783dfeb3
+          path: benchmark-repos/fastapi
+          persist-credentials: false
+      - name: Checkout pinned Flask corpus
+        uses: actions/checkout@v4
+        with:
+          repository: pallets/flask
+          ref: d086db856be187255b8ec61ef409357393020f32
+          path: benchmark-repos/flask
+          persist-credentials: false
+      - name: Validate Vietnamese Dev dataset
+        run: |
+          python -m eval.tools.validate_dataset \
+            --dataset "eval/datasets/dev/E2_Dev_24.jsonl" \
+            --repo-root "fastapi/fastapi=benchmark-repos/fastapi" \
+            --repo-root "pallets/flask=benchmark-repos/flask" \
+            --phase dev \
+            --require-complete
+      - name: Validate English Dev dataset
+        run: |
+          python -m eval.tools.validate_dataset \
+            --dataset "eval/datasets/dev/E2_Dev_24_en.jsonl" \
+            --repo-root "fastapi/fastapi=benchmark-repos/fastapi" \
+            --repo-root "pallets/flask=benchmark-repos/flask" \
+            --phase dev \
+            --require-complete
+      - name: Validate Test dataset (validation only; no evaluation run)
+        run: |
+          python -m eval.tools.validate_dataset \
+            --dataset "eval/datasets/test/E2_Test_48.jsonl" \
+            --repo-root "fastapi/fastapi=benchmark-repos/fastapi" \
+            --repo-root "pallets/flask=benchmark-repos/flask" \
+            --phase test \
+            --require-complete
