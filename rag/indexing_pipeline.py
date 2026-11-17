@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import tempfile
 import threading
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 
 from rag.embeddings.base import Embedder
 from rag.indexing import IndexingService
