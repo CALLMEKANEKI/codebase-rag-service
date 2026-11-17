@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import json
-import shutil
 import tempfile
 import threading
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from rag.embeddings.base import Embedder
 from rag.indexing import IndexingService
