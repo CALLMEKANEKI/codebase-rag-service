@@ -85,9 +85,7 @@ def run_indexing(
                         )
                     update_status(files_done=position)
                 for chunk in chunks:
-                    stream.write(
-                        json.dumps(chunk.to_dict(), ensure_ascii=False) + "\n"
-                    )
+                    stream.write(json.dumps(chunk.to_dict(), ensure_ascii=False) + "\n")
 
             manifest["stats"]["chunks"] = len(chunks)
             (index_root / "manifest.json").write_text(
