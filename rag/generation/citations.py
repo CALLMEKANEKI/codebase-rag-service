@@ -31,8 +31,10 @@ def validate_citations(
         clean_answer = re.sub(r"[ \t]{2,}", " ", clean_answer)
     if not cited_ids:
         return (
-            "I could not find enough evidence in the indexed repository to answer "
-            "that question.",
+            (
+                "I could not find enough evidence in the indexed repository to answer "
+                " "that question."
+            ),
             [],
         )
 
