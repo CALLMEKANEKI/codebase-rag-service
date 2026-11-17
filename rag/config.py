@@ -31,6 +31,10 @@ class Settings(BaseSettings):
         default=Path("storage/indexes"),
         alias="INDEX_STORAGE_PATH",
     )
+    index_registry_path: Path = Field(
+        default=Path("storage/index_registry.sqlite"),
+        alias="INDEX_REGISTRY_PATH",
+    )
     llm_timeout_ms: int = Field(default=30_000, alias="LLM_TIMEOUT_MS")
 
 
