@@ -73,23 +73,31 @@ def ingest(args: argparse.Namespace) -> int:
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(json.dumps({
-        "index_id": index_id,
-        "commit_sha": commit_sha,
-        "files": len(report.files),
-        "chunks": len(chunks),
-        "total_bytes": report.total_bytes,
-        "skipped": report.skipped,
-        "snapshot": str(snapshot_root),
-        "chunks_path": str(chunks_path),
-    }, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                "index_id": index_id,
+                "commit_sha": commit_sha,
+                "files": len(report.files),
+                "chunks": len(chunks),
+                "total_bytes": report.total_bytes,
+                "skipped": report.skipped,
+                "snapshot": str(snapshot_root),
+                "chunks_path": str(chunks_path),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rag")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    ingest_parser = subparsers.add_parser("ingest", help="Create a source snapshot and code chunks")
+    ingest_parser = subparsers.add_parser(
+        "ingest", help="Create a source snapshot and code chunks"
+    )
     source = ingest_parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--repo-url", help="Public GitHub repository URL")
     source.add_argument("--local-path", help="Local Git checkout for development")
