@@ -84,7 +84,9 @@ def clone_repository(
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").lower()
         if "repository not found" in stderr or "not found" in stderr:
-            raise CloneError("GitHub repository was not found or is not public") from exc
+            raise CloneError(
+                "GitHub repository was not found or is not public"
+            ) from exc
         raise CloneError("Unable to clone the requested GitHub repository") from exc
     except OSError as exc:
         raise CloneError("Unable to start Git while cloning the repository") from exc
@@ -116,5 +118,7 @@ def clone_repository(
                 raise CloneError("Requested Git reference was not found") from exc
             raise CloneError("Unable to fetch the requested Git reference") from exc
         except OSError as exc:
-            raise CloneError("Unable to start Git while fetching the requested ref") from exc
+            raise CloneError(
+                "Unable to start Git while fetching the requested ref"
+            ) from exc
     return resolve_commit_sha(target)
