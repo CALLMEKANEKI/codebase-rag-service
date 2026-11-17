@@ -168,7 +168,9 @@ def create_app(
                 {"field": "options"},
             )
 
-        index_root = (\n            Path(request.app.state.settings.index_storage_path) / payload.index_id\n        )
+        index_root = (
+            Path(request.app.state.settings.index_storage_path) / payload.index_id
+        )
         manifest_path = index_root / "manifest.json"
         if not manifest_path.is_file():
             raise APIError(
@@ -185,11 +187,7 @@ def create_app(
             )
             request.app.state.query_service = service
             request.app.state.resources = (store, cache, model)
-        store = (
-            request.app.state.resources[0]
-            if request.app.state.resources
-            else None
-        )
+        store = request.app.state.resources[0] if request.app.state.resources else None
         if store is not None and not store.collection_exists(payload.index_id):
             raise APIError(
                 409,
