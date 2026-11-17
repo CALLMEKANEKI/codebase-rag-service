@@ -16,7 +16,7 @@ from rag.ingestion.filters import (
     enumerate_python_files,
 )
 from rag.ingestion.snapshot import create_snapshot
-from rag.parsing.chunking import CHUNKER_VERSION, chunk_python_bytes
+from rag.parsing.chunking import chunk_python_bytes
 from rag.vectorstore.base import VectorStore
 
 MAX_CHUNKS = 20_000
