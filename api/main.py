@@ -429,14 +429,6 @@ def create_app(
             )
 
         index_root = Path(request.app.state.settings.index_storage_path) / payload.index_id
-        manifest_path = index_root / "manifest.json"
-        if not manifest_path.is_file():
-            raise APIError(
-                404,
-                "INDEX_NOT_FOUND",
-                "Index not found",
-                {"index_id": payload.index_id},
-            )
         row = request.app.state.registry.get(payload.index_id)
         if row is not None and row["status"] != "ready":
             raise APIError(
@@ -444,6 +436,14 @@ def create_app(
                 "INDEX_NOT_READY",
                 "Index is not ready",
                 {"status": row["status"]},
+            )
+        manifest_path = index_root / "manifest.json"
+        if not manifest_path.is_file():
+            raise APIError(
+                404,
+                "INDEX_NOT_FOUND",
+                "Index not found",
+                {"index_id": payload.index_id},
             )
 
         service = request.app.state.query_service
