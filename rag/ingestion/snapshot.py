@@ -40,7 +40,10 @@ def create_snapshot(
     entries = []
     for relative in report.files:
         source_file = source / relative
-        if source_file.is_symlink() or source_file.resolve().parent != source_file.parent.resolve():
+        if (
+            source_file.is_symlink()
+            or source_file.resolve().parent != source_file.parent.resolve()
+        ):
             raise ValueError(f"Unsafe source path: {relative}")
         target = snapshot_root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
