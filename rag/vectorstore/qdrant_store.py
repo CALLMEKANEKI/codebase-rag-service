@@ -35,6 +35,9 @@ class QdrantVectorStore:
             raise ValueError("index_id must contain only letters, digits, '_' or '-'")
         return f"idx_{index_id}"
 
+    def collection_exists(self, index_id: str) -> bool:
+        return self._client.collection_exists(self.collection_name(index_id))
+
     def create_collection(self, index_id: str, vector_size: int) -> None:
         if vector_size < 1:
             raise ValueError("vector_size must be positive")
