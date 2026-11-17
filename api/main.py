@@ -257,7 +257,7 @@ def _read_snapshot_file(
         "path": normalized,
         "start": start,
         "end": last,
-        "content": "\n".join(lines[start - 1 : last]) + ("\n" if last >= start else ""),
+        "content": "".join(lines[start - 1 : last]),
         "language": "python",
     }
 
