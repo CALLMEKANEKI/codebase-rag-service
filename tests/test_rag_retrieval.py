@@ -160,7 +160,6 @@ def test_indexing_service_reads_chunks_jsonl_and_builds_dense_index(tmp_path):
     store.close()
 
 
-
 def test_qdrant_local_path_persists_vectors_between_clients(tmp_path):
     database_path = tmp_path / "qdrant"
     embedder = FakeEmbedder(dim=16)
