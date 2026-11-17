@@ -58,8 +58,9 @@ the current machine because CUDA is unavailable.
 
 ## Local RAG CLI (development baseline)
 
-The CLI currently runs ingestion, embedding/indexing, and dense retrieval as
-separate steps. It does not start the FastAPI service.
+The CLI runs ingestion, embedding/indexing, and dense retrieval as separate
+steps. WP4 adds the first live FastAPI query path (`/v1/health` and `/v1/query`);
+index lifecycle and file-viewer endpoints remain future work.
 
 ### 1. Ingest a repository
 
@@ -114,6 +115,47 @@ python -m ruff check .
 python -m ruff format --check .
 python -m pytest -q
 ```
+
+## Live query API (WP4 baseline)
+
+Install the core requirements and the selected PyTorch/ML requirements above.
+Configure a local `.env` from `.env.example` with `RAG_API_KEY` and
+`GEMINI_API_KEY`. The Gemini model defaults to `gemini-2.5-flash` and can be
+changed with `GEMINI_MODEL`. The model request timeout defaults to 30 seconds.
+
+First ingest and index a repository using the CLI commands above. Then start
+the service:
+
+```powershell
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+```
+
+Call the implemented query endpoint (the index must already have a snapshot
+manifest and a Qdrant collection):
+
+```powershell
+$headers = @{ 'X-API-Key' = 'your-local-rag-key' }
+$body = @{
+  index_id = 'idx_flask'
+  question = 'How does Flask dispatch a request?'
+  top_k = 5
+  options = @{ mode = 'dense'; rerank = $false }
+  debug = $true
+} | ConvertTo-Json -Depth 5
+
+Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/v1/query' -Headers $headers -ContentType 'application/json' -Body $body
+```
+
+The query path uses dense retrieval, bounded numbered context, Gemini generation,
+and citation validation against the chunks actually supplied to the model.
+Unsupported citation markers are discarded; an answer without a valid citation
+fails closed to the insufficient-evidence response. Retrieved repository text
+is explicitly treated as untrusted data in the generation instructions.
+
+Current live-service scope is intentionally partial: `GET /v1/health` and
+`POST /v1/query` are implemented. Index creation/status/deletion and snapshot
+file retrieval remain pending; create and index repositories with the CLI.
+The OpenAPI contract remains unchanged.
 
 ## Mock server (Prism)
 
