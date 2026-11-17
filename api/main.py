@@ -152,7 +152,7 @@ def _run_index_job(
         )
     except IndexCancelled:
         shutil.rmtree(index_root, ignore_errors=True)
-    except Exception:
+    except Exception:  # noqa: BLE001 - persist a safe failed state for any worker crash.
         # The pipeline stores a safe, user-facing failure state. Do not leak
         # repository paths, subprocess output, credentials, or provider errors.
         current = registry.get(index_id)
@@ -357,12 +357,8 @@ def create_app(
         cancelled = request.app.state.cancel_events.get(index_id)
         if cancelled is not None:
             cancelled.set()
-        if future is not None:
-            if not future.cancel():
-                try:
-                    await run_in_threadpool(future.result)
-                except Exception:
-                    pass
+        if future is not None and not future.cancel():
+            await run_in_threadpool(future.result)
 
         runtime = request.app.state.embedding_runtime
         if runtime is not None:
