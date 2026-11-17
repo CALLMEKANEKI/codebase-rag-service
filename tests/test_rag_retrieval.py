@@ -158,3 +158,20 @@ def test_indexing_service_reads_chunks_jsonl_and_builds_dense_index(tmp_path):
     )
     assert retrieved[0].chunk["chunk_id"] == "chunk-one"
     store.close()
+
+
+
+def test_qdrant_local_path_persists_vectors_between_clients(tmp_path):
+    database_path = tmp_path / "qdrant"
+    embedder = FakeEmbedder(dim=16)
+    chunk = make_chunk("persistent-chunk", "persistent retrieval")
+    vector = embedder.embed_query(chunk["text"])
+
+    first_store = QdrantVectorStore(path=database_path)
+    first_store.upsert("persistent", [chunk], [vector])
+    first_store.close()
+
+    second_store = QdrantVectorStore(path=database_path)
+    results = second_store.search("persistent", vector, top_k=1)
+    assert results[0]["payload"]["chunk_id"] == "persistent-chunk"
+    second_store.close()
