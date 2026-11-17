@@ -60,7 +60,7 @@ class IndexRegistry:
         self, index_id: str, repo_url: str, ref: str | None, client_ref: str | None
     ) -> None:
         now = _now()
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 """
                 INSERT INTO indexes (
@@ -82,7 +82,7 @@ class IndexRegistry:
             return
         fields["updated_at"] = _now()
         assignments = ", ".join(f"{key} = ?" for key in fields)
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 f"UPDATE indexes SET {assignments} WHERE index_id = ?",
                 (*fields.values(), index_id),
@@ -90,20 +90,20 @@ class IndexRegistry:
             connection.commit()
 
     def get(self, index_id: str) -> dict[str, Any] | None:
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             row = connection.execute(
                 "SELECT * FROM indexes WHERE index_id = ?", (index_id,)
             ).fetchone()
         return dict(row) if row else None
 
     def delete(self, index_id: str) -> None:
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute("DELETE FROM indexes WHERE index_id = ?", (index_id,))
             connection.commit()
 
     def mark_interrupted_jobs_failed(self) -> None:
         now = _now()
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 """
                 UPDATE indexes
