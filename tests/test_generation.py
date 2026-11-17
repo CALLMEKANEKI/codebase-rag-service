@@ -53,7 +53,7 @@ def test_citation_validator_discards_unknown_refs_and_builds_contract_shape():
     source = build_context([RetrievedChunk(chunk(), 0.9, 1)]).sources
     answer, citations = validate_citations("Found here [1], not [99].", source)
 
-    assert answer == "Found here , not ."
+    assert answer == "Found here [1], not ."
     assert len(citations) == 1
     assert set(citations[0]) == {
         "ref_id",
