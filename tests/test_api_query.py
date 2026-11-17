@@ -9,11 +9,18 @@ class FakeQueryService:
     def query(self, index_id, question, *, top_k=5, debug=False):
         return QueryResult(
             answer="Found in code [1].",
-            citations=[{
-                "ref_id": 1, "file_path": "src/app.py", "symbol": "run",
-                "symbol_kind": "function", "start_line": 1, "end_line": 2,
-                "snippet": "def run(): pass", "score": 0.9,
-            }],
+            citations=[
+                {
+                    "ref_id": 1,
+                    "file_path": "src/app.py",
+                    "symbol": "run",
+                    "symbol_kind": "function",
+                    "start_line": 1,
+                    "end_line": 2,
+                    "snippet": "def run(): pass",
+                    "score": 0.9,
+                }
+            ],
             usage={"input_tokens": 10, "output_tokens": 4},
             debug={"mode": "dense", "retrieved": []} if debug else None,
         )
@@ -33,9 +40,9 @@ def make_client(tmp_path):
 def test_health_is_public_and_query_requires_api_key(tmp_path):
     client = make_client(tmp_path)
     assert client.get("/v1/health").json() == {"status": "ok"}
-    response = client.post("/v1/query", json={
-        "index_id": "idx_demo", "question": "What is this?"
-    })
+    response = client.post(
+        "/v1/query", json={"index_id": "idx_demo", "question": "What is this?"}
+    )
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "UNAUTHORIZED"
 
@@ -62,7 +69,8 @@ def test_query_rejects_unsupported_retrieval_options(tmp_path):
         "/v1/query",
         headers={"X-API-Key": "test-key"},
         json={
-            "index_id": "idx_demo", "question": "What is this?",
+            "index_id": "idx_demo",
+            "question": "What is this?",
             "options": {"mode": "hybrid", "rerank": False},
         },
     )
