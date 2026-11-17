@@ -23,7 +23,7 @@ def ingest(args: argparse.Namespace) -> int:
     with tempfile.TemporaryDirectory(prefix="rag-ingest-") as temporary:
         if args.repo_url:
             source_root = Path(temporary) / "repository"
-            commit_sha = clone_repository(args.repo_url, source_root)
+            commit_sha = clone_repository(args.repo_url, source_root, ref=args.ref)
         else:
             source_root = Path(args.local_path).resolve(strict=True)
             commit_sha = resolve_commit_sha(source_root)
@@ -93,6 +93,7 @@ def build_parser() -> argparse.ArgumentParser:
     source = ingest_parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--repo-url", help="Public GitHub repository URL")
     source.add_argument("--local-path", help="Local Git checkout for development")
+    ingest_parser.add_argument("--ref", help="Branch, tag, or commit to index")
     ingest_parser.add_argument("--index-id")
     ingest_parser.add_argument("--output")
     ingest_parser.add_argument("--strategy", choices=("code", "fixed"), default="code")
