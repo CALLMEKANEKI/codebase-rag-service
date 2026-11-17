@@ -5,9 +5,7 @@ import re
 import subprocess
 from pathlib import Path
 
-GITHUB_REPO_RE = re.compile(
-    r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
-)
+GITHUB_REPO_RE = re.compile(r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 DEFAULT_CLONE_TIMEOUT_SECONDS = 120
 
 
@@ -67,8 +65,13 @@ def clone_repository(
     try:
         subprocess.run(
             [
-                "git", "clone", "--depth", "1", "--no-recurse-submodules",
-                url, str(target),
+                "git",
+                "clone",
+                "--depth",
+                "1",
+                "--no-recurse-submodules",
+                url,
+                str(target),
             ],
             check=True,
             capture_output=True,
