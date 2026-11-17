@@ -2,6 +2,7 @@ import pytest
 
 from rag.embeddings.cache import CachedEmbedder, SQLiteEmbeddingCache
 from rag.embeddings.fake import FakeEmbedder
+from rag.indexing import IndexingService
 from rag.retrieval.dense import DenseRetriever
 from rag.vectorstore.qdrant_store import QdrantVectorStore
 
@@ -122,3 +123,39 @@ def test_embedding_cache_persists_between_instances(tmp_path):
     )
     assert second_cache.get(key) == vector
     second_cache.close()
+
+
+
+def test_indexing_service_reads_chunks_jsonl_and_builds_dense_index(tmp_path):
+    chunks_path = tmp_path / "chunks.jsonl"
+    chunks = [
+        {
+            **make_chunk("chunk-one", "dispatch_request"),
+            "index_id": "flask",
+        },
+        {
+            **make_chunk("chunk-two", "response serialization"),
+            "index_id": "flask",
+        },
+    ]
+    chunks_path.write_text(
+        "\n".join(json.dumps(chunk) for chunk in chunks) + "\n",
+        encoding="utf-8",
+    )
+    embedder = FakeEmbedder(dim=16)
+    store = QdrantVectorStore()
+    result = IndexingService(embedder, store).index_jsonl(
+        "flask",
+        chunks_path,
+        batch_size=1,
+    )
+
+    assert result.chunks_indexed == 2
+    assert result.batches == 2
+    retrieved = DenseRetriever(embedder, store).retrieve(
+        "flask",
+        "dispatch_request",
+        top_k=1,
+    )
+    assert retrieved[0].chunk["chunk_id"] == "chunk-one"
+    store.close()
