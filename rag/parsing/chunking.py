@@ -54,10 +54,18 @@ def _make_chunk(
         raise ValueError(f"Invalid chunk range {start}-{end} for {file_path}")
     text = "".join(source_lines[start - 1 : end])
     content_hash = _hash(text)
-    identity = "|".join((
-        index_id, commit_sha, file_path, str(start), str(end),
-        content_hash, strategy, CHUNKER_VERSION,
-    ))
+    identity = "|".join(
+        (
+            index_id,
+            commit_sha,
+            file_path,
+            str(start),
+            str(end),
+            content_hash,
+            strategy,
+            CHUNKER_VERSION,
+        )
+    )
     return CodeChunk(
         chunk_id=_hash(identity),
         index_id=index_id,
@@ -91,6 +99,11 @@ def _windows(
     return ranges
 
 
+def _node_start(node: ast.AST) -> int:
+    decorators = getattr(node, "decorator_list", [])
+    return min([node.lineno, *(decorator.lineno for decorator in decorators)])
+
+
 def _ast_chunks(source: str, file_path: str) -> list[dict[str, Any]]:
     try:
         tree = ast.parse(source, filename=file_path)
@@ -98,7 +111,8 @@ def _ast_chunks(source: str, file_path: str) -> list[dict[str, Any]]:
         raise SourceError(f"{file_path}: cannot parse Python source: {exc}") from exc
 
     nodes = [
-        node for node in tree.body
+        node
+        for node in tree.body
         if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
     ]
     ranges: list[dict[str, Any]] = []
@@ -107,57 +121,88 @@ def _ast_chunks(source: str, file_path: str) -> list[dict[str, Any]]:
         return ranges
 
     first_symbol = min(
-        (min([n.lineno, *(d.lineno for d in getattr(n, "decorator_list", []))]) for n in nodes),
+        (_node_start(node) for node in nodes),
         default=line_count + 1,
     )
     if first_symbol > 1:
-        ranges.append({
-            "start": 1, "end": first_symbol - 1, "name": None,
-            "qualname": None, "kind": "module", "parent": None,
-        })
+        ranges.append(
+            {
+                "start": 1,
+                "end": first_symbol - 1,
+                "name": None,
+                "qualname": None,
+                "kind": "module",
+                "parent": None,
+            }
+        )
 
+    source_lines = source.splitlines(keepends=True)
     for node in nodes:
-        start = min([node.lineno, *(d.lineno for d in getattr(node, "decorator_list", []))])
+        start = _node_start(node)
         end = node.end_lineno or node.lineno
         name = node.name
+
         if isinstance(node, ast.ClassDef) and end - start + 1 > CODE_CHUNK_LINES:
             methods = [
-                child for child in node.body
+                child
+                for child in node.body
                 if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
             ]
             first_method = min(
-                (min([m.lineno, *(d.lineno for d in getattr(m, "decorator_list", []))]) for m in methods),
+                (_node_start(method) for method in methods),
                 default=end + 1,
             )
             if first_method > start:
-                ranges.append({
-                    "start": start, "end": first_method - 1, "name": name,
-                    "qualname": name, "kind": "class", "parent": None,
-                })
+                ranges.append(
+                    {
+                        "start": start,
+                        "end": first_method - 1,
+                        "name": name,
+                        "qualname": name,
+                        "kind": "class",
+                        "parent": None,
+                    }
+                )
+
             for method in methods:
-                method_start = min([
-                    method.lineno,
-                    *(d.lineno for d in getattr(method, "decorator_list", [])),
-                ])
+                method_start = _node_start(method)
                 method_end = method.end_lineno or method.lineno
-                ranges.extend({
-                    "start": left, "end": right, "name": method.name,
-                    "qualname": f"{name}.{method.name}", "kind": "method",
-                    "parent": name,
-                } for left, right in _windows(
-                    source.splitlines(keepends=True),
-                    method_start, method_end,
-                    window=WINDOW_LINES, overlap=WINDOW_OVERLAP,
-                ))
+                ranges.extend(
+                    {
+                        "start": left,
+                        "end": right,
+                        "name": method.name,
+                        "qualname": f"{name}.{method.name}",
+                        "kind": "method",
+                        "parent": name,
+                    }
+                    for left, right in _windows(
+                        source_lines,
+                        method_start,
+                        method_end,
+                        window=WINDOW_LINES,
+                        overlap=WINDOW_OVERLAP,
+                    )
+                )
         else:
             kind = "class" if isinstance(node, ast.ClassDef) else "function"
-            ranges.extend({
-                "start": left, "end": right, "name": name,
-                "qualname": name, "kind": kind, "parent": None,
-            } for left, right in _windows(
-                source.splitlines(keepends=True), start, end,
-                window=WINDOW_LINES, overlap=WINDOW_OVERLAP,
-            ))
+            ranges.extend(
+                {
+                    "start": left,
+                    "end": right,
+                    "name": name,
+                    "qualname": name,
+                    "kind": kind,
+                    "parent": None,
+                }
+                for left, right in _windows(
+                    source_lines,
+                    start,
+                    end,
+                    window=WINDOW_LINES,
+                    overlap=WINDOW_OVERLAP,
+                )
+            )
     return ranges
 
 
@@ -174,26 +219,40 @@ def chunk_python_source(
     source_lines = source.splitlines(keepends=True)
     if not source_lines:
         return []
+
     if strategy == "fixed":
         ranges = [
             {
-                "start": start, "end": end, "name": None, "qualname": None,
-                "kind": "other", "parent": None,
+                "start": start,
+                "end": end,
+                "name": None,
+                "qualname": None,
+                "kind": "other",
+                "parent": None,
             }
             for start, end in _windows(
-                source_lines, 1, len(source_lines),
-                window=WINDOW_LINES, overlap=WINDOW_OVERLAP,
+                source_lines,
+                1,
+                len(source_lines),
+                window=WINDOW_LINES,
+                overlap=WINDOW_OVERLAP,
             )
         ]
     else:
         ranges = _ast_chunks(source, file_path)
         if not ranges:
-            ranges = [{
-                "start": 1, "end": len(source_lines), "name": None,
-                "qualname": None, "kind": "module", "parent": None,
-            }]
+            ranges = [
+                {
+                    "start": 1,
+                    "end": len(source_lines),
+                    "name": None,
+                    "qualname": None,
+                    "kind": "module",
+                    "parent": None,
+                }
+            ]
 
-    chunks = [
+    return [
         _make_chunk(
             source_lines,
             index_id=index_id,
@@ -210,7 +269,6 @@ def chunk_python_source(
         for item in ranges
         if item["end"] >= item["start"]
     ]
-    return chunks
 
 
 def chunk_python_bytes(
