@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import re
 import shutil
@@ -188,8 +187,11 @@ def _read_snapshot_file(
     snapshot_root = (index_root / "snapshot").resolve()
     file_path = index_root / "snapshot" / Path(*relative.parts)
     try:
-        if file_path.is_symlink():
-            raise FileNotFoundError
+        current = index_root / "snapshot"
+        for part in relative.parts:
+            current = current / part
+            if current.is_symlink():
+                raise FileNotFoundError
         resolved = file_path.resolve(strict=True)
         resolved.relative_to(snapshot_root)
         if not resolved.is_file():
