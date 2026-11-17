@@ -5,8 +5,8 @@ import json
 import shutil
 from pathlib import Path
 
-from rag.ingestion.filters import FilterReport, enumerate_python_files
 from rag.ingestion.clone import resolve_commit_sha
+from rag.ingestion.filters import FilterReport, enumerate_python_files
 
 
 def sha256_file(path: Path) -> str:
