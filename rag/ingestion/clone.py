@@ -5,7 +5,7 @@ import re
 import subprocess
 from pathlib import Path
 
-GITHUB_REPO_RE = re.compile(r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+GITHUB_REPO_RE = re.compile(r"^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 DEFAULT_CLONE_TIMEOUT_SECONDS = 120
 
 
@@ -30,6 +30,8 @@ def git_output(args: list[str], *, cwd: Path | None = None, timeout: int = 15) -
             check=True,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_LFS_SKIP_SMUDGE": "1"},
         )
@@ -76,6 +78,8 @@ def clone_repository(
             check=True,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             env=env,
         )
@@ -98,6 +102,8 @@ def clone_repository(
                 check=True,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
                 env=env,
             )
@@ -107,6 +113,8 @@ def clone_repository(
                 check=True,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
                 env=env,
             )
