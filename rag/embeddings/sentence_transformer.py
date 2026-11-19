@@ -37,7 +37,7 @@ class SentenceTransformerEmbedder:
             device=selected_device,
             trust_remote_code=False,
         )
-        dimension = self._model.get_sentence_embedding_dimension()
+        dimension = self._model.get_embedding_dimension()
         if dimension is None:
             raise RuntimeError(
                 f"Model does not expose an embedding dimension: {model_name}"
