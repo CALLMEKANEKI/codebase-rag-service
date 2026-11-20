@@ -13,7 +13,7 @@ development tooling for the planned service.
   shared AST parsing, code-aware chunking, and a local ingestion CLI.
 - WP3 baseline is implemented: SentenceTransformer / Fake embedders, SQLite
   embedding cache, local Qdrant vector store, and dense retrieval CLI.
-- WP4 baseline is implemented: Gemini generation, citation validation, query API,
+- WP4 baseline is implemented: provider-backed generation, citation validation, query API,
   SQLite index registry, serialized background indexing jobs, index status/deletion,
   and snapshot-backed file viewing.
 
@@ -121,8 +121,12 @@ python -m pytest -q
 
 Install the core requirements and the selected PyTorch/ML requirements above.
 Configure a local `.env` from `.env.example` with `RAG_API_KEY` and
-`GEMINI_API_KEY`. The Gemini model defaults to `gemini-2.5-flash` and can be
-changed with `GEMINI_MODEL`. The model request timeout defaults to 30 seconds.
+`OPENROUTER_API_KEY`. The default provider is OpenRouter. Set
+`OPENROUTER_MODELS` to a comma-separated list of free model IDs in fallback
+priority order; `openrouter/free` is the default automatic free-model router.
+Only `openrouter/free` and model IDs ending in `:free` are accepted in this
+list. Set `LLM_PROVIDER=gemini` with `GEMINI_API_KEY` and `GEMINI_MODEL` to
+use the Gemini adapter instead. The model request timeout defaults to 60 seconds.
 
 First ingest and index a repository using the CLI commands above. Then start
 the service:
@@ -147,7 +151,7 @@ $body = @{
 Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/v1/query' -Headers $headers -ContentType 'application/json' -Body $body
 ```
 
-The query path uses dense retrieval, bounded numbered context, Gemini generation,
+The query path uses dense retrieval, bounded numbered context, the configured LLM provider,
 and citation validation against the chunks actually supplied to the model.
 Unsupported citation markers are discarded; an answer without a valid citation
 fails closed to the insufficient-evidence response. Retrieved repository text
@@ -273,7 +277,7 @@ The implemented API endpoints are:
 | GET | `/v1/indexes/{id}` | Read persisted indexing status and progress |
 | DELETE | `/v1/indexes/{id}` | Cancel queued/running work and remove snapshot/vector data |
 | GET | `/v1/indexes/{id}/files` | Read a bounded line range from the indexed snapshot |
-| POST | `/v1/query` | Ask a question using dense retrieval and Gemini |
+| POST | `/v1/query` | Ask a question using dense retrieval and the configured LLM provider |
 
 Index jobs run in-process with a single worker. The SQLite registry survives
 service restarts; unfinished jobs are marked failed on startup rather than being
@@ -298,6 +302,6 @@ Invoke-RestMethod -Method Get -Uri "$baseUrl/v1/indexes/$indexId" -Headers $head
 ```
 
 The service requires local Git, the dependencies in `requirements-ml.txt`,
-and a working Gemini API key for generation. It is a single-process MVP:
+and a working API key for the configured generation provider. It is a single-process MVP:
 multiple API workers/replicas, durable external job queues, automatic job
 resumption, and distributed cancellation are out of scope.
