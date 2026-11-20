@@ -7,7 +7,6 @@ import httpx
 from rag.generation.base import GenerationResult, LLMError
 from rag.generation.context import SYSTEM_INSTRUCTION
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -73,7 +72,9 @@ class OpenRouterLanguageModel:
                 payload = response.json()
                 content = payload["choices"][0]["message"]["content"]
                 if not isinstance(content, str) or not content.strip():
-                    raise ValueError("OpenRouter returned an empty or non-text response")
+                    raise ValueError(
+                        "OpenRouter returned an empty or non-text response"
+                    )
 
                 usage = payload.get("usage") or {}
                 actual_model = payload.get("model") or model
