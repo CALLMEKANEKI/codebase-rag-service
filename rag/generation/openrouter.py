@@ -4,8 +4,8 @@ import logging
 
 import httpx
 
-from rag.generation.context import SYSTEM_INSTRUCTION
 from rag.generation.base import GenerationResult, LLMError
+from rag.generation.context import SYSTEM_INSTRUCTION
 
 
 logger = logging.getLogger(__name__)
