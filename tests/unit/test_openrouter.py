@@ -78,7 +78,9 @@ def test_openrouter_wraps_provider_errors(monkeypatch):
         def post(self, url, **kwargs):
             request = httpx.Request("POST", url)
             response = httpx.Response(429, request=request)
-            raise httpx.HTTPStatusError("rate limited", request=request, response=response)
+            raise httpx.HTTPStatusError(
+                "rate limited", request=request, response=response
+            )
 
         def close(self):
             pass
