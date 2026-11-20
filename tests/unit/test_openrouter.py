@@ -44,7 +44,7 @@ def test_openrouter_sends_ordered_fallbacks_and_returns_usage(monkeypatch):
     monkeypatch.setattr(module.httpx, "Client", FakeClient)
     llm = OpenRouterLanguageModel(
         api_key="test-key",
-        models=["first/model:free", "second/model:free"],
+        models=["first/model:free", "second/model"],
         timeout_ms=15_000,
         site_url="https://example.test",
     )
@@ -55,19 +55,11 @@ def test_openrouter_sends_ordered_fallbacks_and_returns_usage(monkeypatch):
     assert result.output_tokens == 8
     assert captured["request"]["json"]["models"] == [
         "first/model:free",
-        "second/model:free",
+        "second/model",
     ]
     assert captured["request"]["json"]["stream"] is False
     assert captured["client"]["headers"]["Authorization"] == "Bearer test-key"
     assert captured["client"]["headers"]["HTTP-Referer"] == "https://example.test"
-
-
-def test_openrouter_rejects_non_free_models():
-    with pytest.raises(ValueError, match="Only OpenRouter free models"):
-        OpenRouterLanguageModel(
-            api_key="test-key",
-            models=["openai/some-paid-model"],
-        )
 
 
 def test_openrouter_wraps_provider_errors(monkeypatch):
