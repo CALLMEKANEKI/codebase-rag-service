@@ -30,6 +30,8 @@ def git_output(args: list[str], *, cwd: Path | None = None, timeout: int = 15) -
             check=True,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_LFS_SKIP_SMUDGE": "1"},
         )
@@ -76,13 +78,22 @@ def clone_repository(
             check=True,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             env=env,
         )
     except subprocess.TimeoutExpired as exc:
         raise CloneError(f"Clone timed out after {timeout} seconds") from exc
-    except (OSError, subprocess.CalledProcessError) as exc:
-        raise CloneError(f"Unable to clone repository: {exc}") from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").lower()
+        if "repository not found" in stderr or "not found" in stderr:
+            raise CloneError(
+                "GitHub repository was not found or is not public"
+            ) from exc
+        raise CloneError("Unable to clone the requested GitHub repository") from exc
+    except OSError as exc:
+        raise CloneError("Unable to start Git while cloning the repository") from exc
     if ref:
         try:
             subprocess.run(
@@ -91,6 +102,8 @@ def clone_repository(
                 check=True,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
                 env=env,
             )
@@ -100,11 +113,20 @@ def clone_repository(
                 check=True,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
                 env=env,
             )
         except subprocess.TimeoutExpired as exc:
             raise CloneError(f"Fetching ref timed out after {timeout} seconds") from exc
-        except (OSError, subprocess.CalledProcessError) as exc:
-            raise CloneError(f"Unable to checkout requested ref: {exc}") from exc
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").lower()
+            if "not found" in stderr or "couldn't find remote ref" in stderr:
+                raise CloneError("Requested Git reference was not found") from exc
+            raise CloneError("Unable to fetch the requested Git reference") from exc
+        except OSError as exc:
+            raise CloneError(
+                "Unable to start Git while fetching the requested ref"
+            ) from exc
     return resolve_commit_sha(target)

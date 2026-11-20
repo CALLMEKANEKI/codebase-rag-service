@@ -13,8 +13,9 @@ development tooling for the planned service.
   shared AST parsing, code-aware chunking, and a local ingestion CLI.
 - WP3 baseline is implemented: SentenceTransformer / Fake embedders, SQLite
   embedding cache, local Qdrant vector store, and dense retrieval CLI.
-- FastAPI integration, Gemini generation, citation validation, index registry /
-  job lifecycle, and the end-to-end API pipeline are still pending.
+- WP4 baseline is implemented: Gemini generation, citation validation, query API,
+  SQLite index registry, serialized background indexing jobs, index status/deletion,
+  and snapshot-backed file viewing.
 
 The source of truth for the API contract is `contracts/openapi.yaml`.
 
@@ -58,8 +59,9 @@ the current machine because CUDA is unavailable.
 
 ## Local RAG CLI (development baseline)
 
-The CLI currently runs ingestion, embedding/indexing, and dense retrieval as
-separate steps. It does not start the FastAPI service.
+The CLI runs ingestion, embedding/indexing, and dense retrieval as separate
+steps. WP4 adds the first live FastAPI query path (`/v1/health` and `/v1/query`);
+index lifecycle and file-viewer endpoints remain future work.
 
 ### 1. Ingest a repository
 
@@ -114,6 +116,47 @@ python -m ruff check .
 python -m ruff format --check .
 python -m pytest -q
 ```
+
+## Live query API (WP4 baseline)
+
+Install the core requirements and the selected PyTorch/ML requirements above.
+Configure a local `.env` from `.env.example` with `RAG_API_KEY` and
+`GEMINI_API_KEY`. The Gemini model defaults to `gemini-2.5-flash` and can be
+changed with `GEMINI_MODEL`. The model request timeout defaults to 30 seconds.
+
+First ingest and index a repository using the CLI commands above. Then start
+the service:
+
+```powershell
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+```
+
+Call the implemented query endpoint (the index must already have a snapshot
+manifest and a Qdrant collection):
+
+```powershell
+$headers = @{ 'X-API-Key' = 'your-local-rag-key' }
+$body = @{
+  index_id = 'idx_flask'
+  question = 'How does Flask dispatch a request?'
+  top_k = 5
+  options = @{ mode = 'dense'; rerank = $false }
+  debug = $true
+} | ConvertTo-Json -Depth 5
+
+Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/v1/query' -Headers $headers -ContentType 'application/json' -Body $body
+```
+
+The query path uses dense retrieval, bounded numbered context, Gemini generation,
+and citation validation against the chunks actually supplied to the model.
+Unsupported citation markers are discarded; an answer without a valid citation
+fails closed to the insufficient-evidence response. Retrieved repository text
+is explicitly treated as untrusted data in the generation instructions.
+
+Current live-service scope is intentionally partial: `GET /v1/health` and
+`POST /v1/query` are implemented. Index creation/status/deletion and snapshot
+file retrieval remain pending; create and index repositories with the CLI.
+The OpenAPI contract remains unchanged.
 
 ## Mock server (Prism)
 
@@ -208,3 +251,53 @@ contract:
   with `application/problem+json`, not the contract's `ErrorResponse` shape.
 - These mock responses do not exercise the service's actual authentication,
   repository validation, index lifecycle, file lookup, or query logic.
+
+## FastAPI service (WP4)
+
+Configure `.env` from `.env.example`. Set a private `RAG_API_KEY` and a
+`GEMINI_API_KEY` before using the query endpoint. The embedding model is loaded
+on the first indexing or query request; its first use may download model files.
+
+Start the API:
+
+```powershell
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+```
+
+The implemented API endpoints are:
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/v1/health` | Public health check |
+| POST | `/v1/indexes` | Queue indexing for an allowlisted public GitHub repository |
+| GET | `/v1/indexes/{id}` | Read persisted indexing status and progress |
+| DELETE | `/v1/indexes/{id}` | Cancel queued/running work and remove snapshot/vector data |
+| GET | `/v1/indexes/{id}/files` | Read a bounded line range from the indexed snapshot |
+| POST | `/v1/query` | Ask a question using dense retrieval and Gemini |
+
+Index jobs run in-process with a single worker. The SQLite registry survives
+service restarts; unfinished jobs are marked failed on startup rather than being
+silently reported as active. A restart does not automatically resume indexing.
+File viewing is restricted to manifest-listed snapshot files, rejects traversal
+and symlinks, and returns at most 2,000 lines per request.
+
+Example:
+
+```powershell
+$baseUrl = 'http://127.0.0.1:8000'
+$headers = @{ 'X-API-Key' = $env:RAG_API_KEY }
+$body = @{
+  repo_url = 'https://github.com/pallets/flask'
+  ref = 'd086db856be187255b8ec61ef409357393020f32'
+} | ConvertTo-Json -Compress
+
+$created = Invoke-RestMethod -Method Post -Uri "$baseUrl/v1/indexes" -Headers $headers -ContentType 'application/json' -Body $body
+$indexId = $created.index_id
+# Poll GET /v1/indexes/$indexId until status is ready or failed.
+Invoke-RestMethod -Method Get -Uri "$baseUrl/v1/indexes/$indexId" -Headers $headers
+```
+
+The service requires local Git, the dependencies in `requirements-ml.txt`,
+and a working Gemini API key for generation. It is a single-process MVP:
+multiple API workers/replicas, durable external job queues, automatic job
+resumption, and distributed cancellation are out of scope.
