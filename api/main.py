@@ -22,7 +22,7 @@ from rag.config import Settings, get_settings
 from rag.embeddings.cache import CachedEmbedder, SQLiteEmbeddingCache
 from rag.embeddings.sentence_transformer import SentenceTransformerEmbedder
 from rag.generation.base import LLMError
-from rag.generation.gemini import GeminiLanguageModel
+from rag.generation.factory import build_language_model
 from rag.generation.service import QueryService
 from rag.index_registry import IndexRegistry
 from rag.indexing_pipeline import IndexCancelled, run_indexing
@@ -126,14 +126,13 @@ def _get_query_service(app: FastAPI):
         if app.state.query_service is not None:
             return app.state.query_service
         settings: Settings = app.state.settings
-        if not settings.gemini_api_key:
-            raise APIError(502, "LLM_ERROR", "The language model is not configured")
         embedder, store, _cache = _get_embedding_runtime(app)
-        model = GeminiLanguageModel(
-            api_key=settings.gemini_api_key,
-            model=settings.gemini_model,
-            timeout_ms=settings.llm_timeout_ms,
-        )
+        try:
+            model = build_language_model(settings)
+        except ValueError as exc:
+            raise APIError(
+                502, "LLM_ERROR", "The configured language model is unavailable"
+            ) from exc
         app.state.resources.append(("model", model))
         app.state.query_service = QueryService(DenseRetriever(embedder, store), model)
         return app.state.query_service
