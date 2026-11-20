@@ -64,7 +64,7 @@ class OpenRouterLanguageModel:
             payload = response.json()
             content = payload["choices"][0]["message"]["content"]
             if not isinstance(content, str):
-                raise ValueError("OpenRouter returned a non-text response")
+                raise TypeError("OpenRouter returned a non-text response")
             usage = payload.get("usage") or {}
             return GenerationResult(
                 text=content.strip(),
