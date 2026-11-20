@@ -24,16 +24,6 @@ class OpenRouterLanguageModel:
             raise ValueError("OPENROUTER_API_KEY is required")
         if not models:
             raise ValueError("At least one OpenRouter model is required")
-        invalid = [
-            model
-            for model in models
-            if model != "openrouter/free" and not model.endswith(":free")
-        ]
-        if invalid:
-            raise ValueError(
-                "Only OpenRouter free models are allowed in OPENROUTER_MODELS"
-            )
-
         self.models = models
         self._client = httpx.Client(
             timeout=httpx.Timeout(timeout_ms / 1000),
