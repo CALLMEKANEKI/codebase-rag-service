@@ -124,9 +124,10 @@ Configure a local `.env` from `.env.example` with `RAG_API_KEY` and
 `OPENROUTER_API_KEY`. The default provider is OpenRouter. Set
 `OPENROUTER_MODELS` to a comma-separated list of free model IDs in fallback
 priority order; `openrouter/free` is the default automatic free-model router.
-Only `openrouter/free` and model IDs ending in `:free` are accepted in this
-list. Set `LLM_PROVIDER=gemini` with `GEMINI_API_KEY` and `GEMINI_MODEL` to
-use the Gemini adapter instead. The model request timeout defaults to 60 seconds.
+For free-tier testing, use `openrouter/free` or model IDs ending in `:free`.
+Paid model IDs are also supported and may incur charges. Set
+`LLM_PROVIDER=gemini` with `GEMINI_API_KEY` and `GEMINI_MODEL` to use the
+Gemini adapter instead. The model request timeout defaults to 60 seconds.
 
 First ingest and index a repository using the CLI commands above. Then start
 the service:
