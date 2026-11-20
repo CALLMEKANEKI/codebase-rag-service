@@ -126,13 +126,13 @@ def _get_query_service(app: FastAPI):
         if app.state.query_service is not None:
             return app.state.query_service
         settings: Settings = app.state.settings
+        embedder, store, _cache = _get_embedding_runtime(app)
         try:
             model = build_language_model(settings)
         except ValueError as exc:
             raise APIError(
                 502, "LLM_ERROR", "The configured language model is unavailable"
             ) from exc
-        embedder, store, _cache = _get_embedding_runtime(app)
         app.state.resources.append(("model", model))
         app.state.query_service = QueryService(DenseRetriever(embedder, store), model)
         return app.state.query_service
