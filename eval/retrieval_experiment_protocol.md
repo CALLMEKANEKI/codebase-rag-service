@@ -42,9 +42,18 @@ Hold retrieval rankings constant. Compare context construction with headers
 enabled and disabled. The enabled header contains file path, inclusive line
 range, symbol name, and the first docstring line when available.
 
-Record context character/token budget, included source count, truncation count,
-and downstream answer/citation quality if an approved answer evaluation is
-performed. Header ablation must not silently change candidate retrieval.
+The ablation must use one fixed Hybrid top-k ranking per question for both
+arms. The disabled arm retains only numbered citation markers (for example
+`[1]`) and removes file path, line range, symbol, and docstring metadata; the
+enabled arm includes those metadata fields. This isolates metadata headers
+without removing the citation mechanism.
+
+Record the character budget, actual context character count, included source
+count, and truncation count for each question. Token counts are not currently
+measured by this retrieval-only runner. Downstream answer/citation quality
+requires a separately approved LLM evaluation and must not be inferred from
+context length alone. Header ablation must not silently change candidate
+retrieval.
 
 ## Reproducibility
 
@@ -95,7 +104,13 @@ from relevance-ranking metric averages because they have no positive ground
 truth. The runner warms the embedding/BM25 paths and loads the cross-encoder
 before timed queries; reranker model-load time is recorded separately.
 
-This runner measures retrieval only. It does not call the LLM, score generated
-answers, perform the R28 context-header ablation, or read the held-out Test
-split. Run the two Dev dataset files separately and retain their outputs as
-separate experiment runs rather than combining the translated question sets.
+The runner measures retrieval and performs the R28 context-construction
+ablation. It does not call the LLM or score generated answers/citations, and it
+does not read the held-out Test split. The R28 comparison uses the same Hybrid
+top-k ranking for both header settings and writes per-question measurements to
+`context_ablation_raw.jsonl` plus aggregate measurements to
+`retrieval_summary.json`. The character budget defaults to 48,000 and can be
+changed with `--context-max-chars`. Token counts and downstream answer/citation
+quality remain unmeasured. Run the two Dev dataset files separately and retain
+their outputs as separate experiment runs rather than combining translated
+question sets.
