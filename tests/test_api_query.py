@@ -72,7 +72,7 @@ def test_query_rejects_unsupported_retrieval_options(tmp_path):
         json={
             "index_id": "idx_demo",
             "question": "What is this?",
-            "options": {"mode": "hybrid", "rerank": False},
+            "options": {"mode": "unknown", "rerank": False},
         },
     )
 
