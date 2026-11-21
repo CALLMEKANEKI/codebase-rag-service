@@ -11,9 +11,9 @@ Status: **R23–R28 development work and Dev experiments completed; feature-free
 - [x] R28 fixed-ranking context-header ablation results are recorded from the successful Dev experiment.
 - [x] Existing API contract conformance remains unchanged.
 - [x] CI, lint, formatting, and unit tests pass.
-- [ ] Local startup, index lifecycle, and query smoke tests pass.
-- [ ] Deployment target, public-link requirement, operational budget, and secret
-      management are explicitly decided.
+- [ ] Web-team local startup, index lifecycle, and end-to-end query smoke tests are confirmed on a clean clone.
+- [x] Deployment is explicitly deferred; no hosting target or public backend URL will be provisioned in this phase.
+- [ ] Future hosting target, public-link requirement, operational budget, and production secret management are decided before any deployment.
 
 ## R25–R27 development retrieval results
 
@@ -148,10 +148,41 @@ Keep the held-out Test split reserved for the separately approved final
 evaluation. Deployment target, public-link requirement, operational budget,
 secret management, local startup, and end-to-end smoke tests remain pending.
 
+## R29 handoff and deployment decision
+
+**Decision: do not deploy in this phase.** The backend remains a repository
+deliverable for the web team to clone and run locally. No hosting provider,
+public URL, production environment, or deployment budget is selected.
+
+The web-team setup and integration instructions are in
+[`docs/web-team-local-handoff.md`](web-team-local-handoff.md). The guide pins
+the current open PR branch `work/wp6-retrieval-reranking` because PR #10 has not
+been merged. Once the PR is approved and merged, the web team can clone the
+default branch instead.
+
+The handoff guide covers Python 3.11 setup, CPU/GPU dependency selection,
+local environment configuration, backend startup, repository indexing,
+Hybrid query examples, endpoint inventory, and local integration constraints.
+
+Important integration constraints:
+- Keep API and provider keys on the server side; do not expose them in browser
+  bundles. A web-server proxy should attach `X-API-Key`.
+- The API currently has no configured CORS middleware. Direct browser calls
+  from a different origin may fail preflight; use a same-origin proxy or agree
+  on explicit local CORS origins before implementing CORS.
+- The service is a single-process local MVP with local storage; it is not a
+  shared or production-hosted service.
+
+R29 is therefore complete as a **scope/decision and handoff**, not as a
+feature-freeze or deployment approval. Before future deployment, the project
+owner must decide hosting, public access, budget, secret management, and
+operational requirements. Local end-to-end validation by the web team remains
+pending and should be recorded when actually performed.
+
 ## Decision
 
-**No feature freeze or deployment approval yet.** Provisional direction:
-continue with Hybrid and BM25 as candidates; keep reranking optional/off by
-default. R28 is complete. Obtain project-owner approval on the BM25/Hybrid choice,
-context-header default, deployment target, public-link requirement, operational
-budget, and secret-management plan before declaring feature freeze or deploying.
+**No feature freeze or deployment approval yet.** R29 records the current
+choice to defer deployment and hand the backend to the web team for local
+integration. Keep BM25 and Hybrid as candidates, reranking optional/off by
+default, and the Test split reserved. The web team must complete the local
+smoke-test checklist before integration is considered verified.
