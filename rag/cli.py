@@ -126,7 +126,10 @@ def index_chunks(args: argparse.Namespace) -> int:
             for line in Path(args.chunks_path).read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
-        BM25Index.build(Path(args.qdrant_path).parent / "indexes" / args.index_id / "bm25.sqlite3", chunks)
+        BM25Index.build(
+            Path(args.qdrant_path).parent / "indexes" / args.index_id / "bm25.sqlite3",
+            chunks,
+        )
         print(
             json.dumps(
                 {
