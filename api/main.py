@@ -28,8 +28,8 @@ from rag.index_registry import IndexRegistry
 from rag.indexing_pipeline import IndexCancelled, run_indexing
 from rag.ingestion.clone import validate_repo_url
 from rag.parsing.chunking import CHUNKER_VERSION
-from rag.retrieval.dense import DenseRetriever
 from rag.retrieval.bm25 import BM25Retriever
+from rag.retrieval.dense import DenseRetriever
 from rag.retrieval.hybrid import HybridRetriever
 from rag.retrieval.reranker import CrossEncoderReranker, RerankingRetriever
 from rag.vectorstore.qdrant_store import QdrantVectorStore
