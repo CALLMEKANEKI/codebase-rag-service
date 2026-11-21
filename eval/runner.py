@@ -392,9 +392,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     }
                 )
 
-        with context_raw_path.open(
-            "w", encoding="utf-8", newline="\n"
-        ) as context_file:
+        with context_raw_path.open("w", encoding="utf-8", newline="\n") as context_file:
             for row in context_rows:
                 context_file.write(json.dumps(row, ensure_ascii=False) + "\n")
 
