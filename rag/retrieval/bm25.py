@@ -18,7 +18,7 @@ _CAMEL_BOUNDARY_2 = re.compile(r"([A-Z]+)([A-Z][a-z])")
 
 def tokenize_code(text: str) -> list[str]:
     """Tokenize source code identifiers while retaining full and split forms."""
-    normalized = _CAMEL_BOUNDARY_2.sub(r"\\1 \\2", text)
+    normalized = _CAMEL_BOUNDARY_2.sub(r"\1 \2", text)
     normalized = _CAMEL_BOUNDARY_1.sub(r"\\1 \\2", normalized)
     tokens: list[str] = []
     for match in _TOKEN_RE.finditer(normalized):
