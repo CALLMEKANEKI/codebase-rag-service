@@ -23,6 +23,7 @@ from eval.tools.corpus import (
 )
 from eval.tools.symbols import decode_source, symbols_for_source
 from rag.embeddings.cache import CachedEmbedder, SQLiteEmbeddingCache
+from rag.generation.context import build_context
 from rag.embeddings.sentence_transformer import SentenceTransformerEmbedder
 from rag.parsing.chunking import CHUNKER_VERSION, chunk_python_bytes
 from rag.retrieval.bm25 import BM25Index, BM25Retriever
@@ -220,6 +221,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     raw_path = output_dir / "retrieval_raw.jsonl"
     summary_path = output_dir / "retrieval_summary.json"
+    context_raw_path = output_dir / "context_ablation_raw.jsonl"
     index_root = output_dir / "indexes"
     qdrant_path = output_dir / "qdrant"
     cache_path = output_dir / "embedding_cache.sqlite"
@@ -292,6 +294,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         reranker_load_ms = (time.perf_counter() - reranker_load_started) * 1000
 
         raw_rows: list[dict[str, Any]] = []
+        context_rows: list[dict[str, Any]] = []
         with raw_path.open("w", encoding="utf-8", newline="\n") as raw_file:
             for record in records:
                 repo_id = record["repo"]
@@ -382,6 +385,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "max_candidates": args.max_candidates,
                 "chunker_version": CHUNKER_VERSION,
                 "header_enabled": args.header_enabled,
+                "context_ablation": "same Hybrid top-k ranking; citation markers retained in both arms; metadata header toggled",
+                "context_max_chars": args.context_max_chars,
                 "python": platform.python_version(),
                 "platform": platform.platform(),
                 "latency_method": (
@@ -391,6 +396,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "cache_state": "persistent SQLite cache; see output directory",
             },
             "index": index_metadata,
+            "context_ablation": context_summary,
+            "context_ablation_raw": str(context_raw_path),
             "results": {
                 variant: _aggregate(
                     [row for row in raw_rows if row["variant"] == variant]
@@ -430,13 +437,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rrf-k", type=int, default=60)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--header-enabled", action="store_true")
+    parser.add_argument("--context-max-chars", type=int, default=48_000)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        if args.top_k < 1 or args.candidate_multiplier < 1 or args.max_candidates < 1:
+        if (
+            args.top_k < 1
+            or args.candidate_multiplier < 1
+            or args.max_candidates < 1
+            or args.context_max_chars < 1
+        ):
             raise ConfigurationError(
                 "top-k and candidate-pool settings must be positive"
             )
