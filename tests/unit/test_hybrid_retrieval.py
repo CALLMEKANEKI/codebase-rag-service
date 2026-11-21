@@ -24,7 +24,10 @@ def test_rrf_fuses_dense_and_lexical_rankings_deterministically():
 
 def test_rrf_deduplicates_chunks_and_validates_arguments():
     import pytest
-    retriever = HybridRetriever(FakeRetriever([item("a", 1)]), FakeRetriever([item("a", 1)]))
+
+    retriever = HybridRetriever(
+        FakeRetriever([item("a", 1)]), FakeRetriever([item("a", 1)])
+    )
     assert len(retriever.retrieve("idx", "query", 5)) == 1
     with pytest.raises(ValueError):
         retriever.retrieve("idx", " ", 5)
