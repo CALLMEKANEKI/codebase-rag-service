@@ -1,6 +1,6 @@
 # WP6 feature-freeze and deployment decision gate
 
-Status: **Development retrieval benchmark completed; feature-freeze and deployment decision remain pending.**
+Status: **R23–R28 development work and Dev experiments completed; feature-freeze and deployment decision remain pending.**
 
 ## Required evidence
 
@@ -8,7 +8,7 @@ Status: **Development retrieval benchmark completed; feature-freeze and deployme
 - [x] R24 RRF unit tests pass.
 - [x] R25 development-set Dense vs BM25 vs Hybrid results are recorded.
 - [x] R27 Hybrid vs Hybrid + reranker results are recorded, including latency.
-- [ ] R28 context-header ablation results are recorded; the fixed-ranking ablation implementation and CI tests are complete, while the Dev experiment is pending.
+- [x] R28 fixed-ranking context-header ablation results are recorded from the successful Dev experiment.
 - [x] Existing API contract conformance remains unchanged.
 - [x] CI, lint, formatting, and unit tests pass.
 - [ ] Local startup, index lifecycle, and query smoke tests pass.
@@ -121,12 +121,27 @@ ranking and builds both variants from that exact ranking:
 - Header enabled: citation marker plus file path, inclusive line range, symbol,
   and first docstring line when available.
 
-Per-question measurements are written to `context_ablation_raw.jsonl`;
-aggregate character/source/truncation measurements are included in
-`retrieval_summary.json`. Default context budget is 48,000 characters.
-Token counts are not measured by this runner. The current workflow execution
-is pending; do not report R28 measurements until its artifact is available.
-No LLM answer or citation-quality evaluation is performed.
+Authoritative run: [R28 Dev workflow run #8](https://github.com/CALLMEKANEKI/codebase-rag-service/actions/runs/44866892069).
+Artifact: [retrieval-evaluation-dev-vi](https://github.com/CALLMEKANEKI/codebase-rag-service/actions/runs/44866892069/artifacts/14692042261).
+
+The run contains 48 records: 24 Dev questions × 2 context variants. All 24
+paired comparisons retained identical retrieved and included chunk IDs,
+confirming that only context-header construction changed.
+
+| Measurement | Header enabled | Header disabled |
+|---|---:|---:|
+| Questions | 24 | 24 |
+| Mean context characters | 15,144.2 | 14,275.0 |
+| Mean included sources | 10 | 10 |
+| Total truncated sources | 0 | 0 |
+| Questions with truncation | 0 | 0 |
+| Mean token count | Not measured | Not measured |
+
+Metadata headers add a mean of 869.2 characters per question, approximately
+6.09% relative to the header-disabled context. This is a context-size trade-off
+only; this experiment does not call the LLM and does not measure answer quality,
+citation correctness, or downstream user-visible behavior. Token counts are
+not measured. The default context budget is 48,000 characters.
 
 Do not claim that Hybrid or reranking improves all retrieval quality measures.
 Keep the held-out Test split reserved for the separately approved final
@@ -137,5 +152,6 @@ secret management, local startup, and end-to-end smoke tests remain pending.
 
 **No feature freeze or deployment approval yet.** Provisional direction:
 continue with Hybrid and BM25 as candidates; keep reranking optional/off by
-default. Complete R28 and obtain project-owner approval before selecting a
-deployment target or declaring feature freeze.
+default. R28 is complete. Obtain project-owner approval on the BM25/Hybrid choice,
+context-header default, deployment target, public-link requirement, operational
+budget, and secret-management plan before declaring feature freeze or deploying.
