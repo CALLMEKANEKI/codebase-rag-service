@@ -7,6 +7,8 @@ from rag.retrieval.bm25 import BM25Retriever
 class HybridRetriever:
     """Fuse dense and BM25 rankings using Reciprocal Rank Fusion."""
 
+    mode = "hybrid"
+
     def __init__(
         self,
         dense: DenseRetriever,
