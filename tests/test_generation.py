@@ -113,7 +113,7 @@ def test_context_header_can_be_disabled_without_losing_citation_markers():
         include_header=False,
     )
 
-    assert context.text.startswith("[1]\\ndef dispatch_request")
+    assert context.text.startswith("[1]\ndef dispatch_request")
     assert "src/app.py" not in context.text
     assert "dispatch_request (" not in context.text
     assert context.sources[0].ref_id == 1
