@@ -72,6 +72,7 @@ Check out the two corpus snapshots at the exact commits in
 python -m eval.runner `
   --fastapi-root "C:\GitHub\fastapi" `
   --flask-root "C:\GitHub\flask" `
+  --output "eval/results/dev-vi" `
   --device cpu
 ```
 
@@ -81,8 +82,9 @@ against their pinned commits and corpus snapshots before indexing. It builds
 the source-profile chunks and temporary local Qdrant/SQLite indexes, then
 compares Dense, BM25, Hybrid, and Hybrid + Reranker. The default dataset is
 `eval/datasets/dev/E2_Dev_24.jsonl`; select
-`--dataset eval/datasets/dev/E2_Dev_24_en.jsonl` to run the English variant
-as a separate experiment.
+`--dataset eval/datasets/dev/E2_Dev_24_en.jsonl` with a distinct output
+directory (for example `--output eval/results/dev-en`) to run the English
+variant as a separate experiment without overwriting the Vietnamese run.
 
 Outputs are written to `eval/results/dev/` by default:
 `retrieval_raw.jsonl` contains per-question rankings, metrics, candidate
