@@ -307,7 +307,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                         candidate_count = len(ranked)
                     else:
                         candidate_k = min(args.top_k * args.candidate_multiplier, args.max_candidates)
-                        candidates = components["hybrid"].retrieve(index_id, query, candidate_k)
+                        candidates = components["hybrid"].retrieve(
+                            index_id, query, candidate_k
+                        )
                         candidate_count = len(candidates)
                         retrieval_ms = (time.perf_counter() - retrieval_started) * 1000
                         rerank_started = time.perf_counter()
@@ -344,7 +346,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "dataset_sha256": _sha256(dataset_path),
                 "split": "dev",
                 "question_count": len(records),
-                "answerable_question_count": sum(bool(row["answerable"]) for row in records),
+                "answerable_question_count": sum(
+                    bool(row["answerable"]) for row in records
+                ),
                 "repo_commits": {
                     repo_id: profiles[repo_id].commit_sha for repo_id in active_repos
                 },
@@ -372,7 +376,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             },
             "index": index_metadata,
             "results": {
-                variant: _aggregate([row for row in raw_rows if row["variant"] == variant])
+                variant: _aggregate(
+                    [row for row in raw_rows if row["variant"] == variant]
+                )
                 for variant in VARIANTS
             },
             "raw_results": str(raw_path),
@@ -398,7 +404,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, default=Path("eval/results/dev"))
     parser.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
-    parser.add_argument("--reranker-model", default="cross-encoder/ms-marco-MiniLM-L-6-v2")
+    parser.add_argument(
+        "--reranker-model", default="cross-encoder/ms-marco-MiniLM-L-6-v2"
+    )
     parser.add_argument("--reranker-device", default="auto")
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--candidate-multiplier", type=int, default=4)
@@ -413,7 +421,9 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         if args.top_k < 1 or args.candidate_multiplier < 1 or args.max_candidates < 1:
-            raise ConfigurationError("top-k and candidate-pool settings must be positive")
+            raise ConfigurationError(
+                "top-k and candidate-pool settings must be positive"
+            )
         summary = run(args)
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 0
