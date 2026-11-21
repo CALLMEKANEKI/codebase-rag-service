@@ -9,7 +9,6 @@ import statistics
 import subprocess
 import sys
 import time
-from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -34,6 +33,12 @@ from rag.vectorstore.qdrant_store import QdrantVectorStore
 
 VARIANTS = ("dense", "bm25", "hybrid", "hybrid_rerank")
 DEFAULT_DATASET = Path(__file__).parent / "datasets" / "dev" / "E2_Dev_24.jsonl"
+
+
+def _directory_size(path: Path) -> int:
+    if not path.exists():
+        return 0
+    return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
 
 
 def _sha256(path: Path) -> str:
@@ -256,9 +261,21 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "chunks": len(chunks),
                 "build_ms": build_ms,
                 "bm25_index_bytes": (bm25_root / index_id / "bm25.sqlite3").stat().st_size,
+                "dense_index_bytes": _directory_size(qdrant_path),
                 "embedding_model": embedder.model_name,
                 "embedding_device": embedder_base.device,
             }
+
+        # Warm lazy BM25 loading and the embedding path before collecting latency.
+        first_question_by_repo = {
+            repo_id: next(row["question"] for row in records if row["repo"] == repo_id)
+            for repo_id in active_repos
+        }
+        for repo_id, question in first_question_by_repo.items():
+            item = retrievers[repo_id]
+            index_id = item["index_id"]
+            item["dense"].retrieve(index_id, question, top_k=args.top_k)
+            item["bm25"].retrieve(index_id, question, top_k=args.top_k)
 
         # Load the cross-encoder before timing queries so every reranker query is warm.
         reranker_load_started = time.perf_counter()
@@ -278,15 +295,20 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 for variant in VARIANTS:
                     retrieval_started = time.perf_counter()
                     reranker_ms = None
+                    candidate_count = 0
                     if variant == "dense":
                         ranked = components["dense"].retrieve(index_id, query, args.top_k)
+                        candidate_count = len(ranked)
                     elif variant == "bm25":
                         ranked = components["bm25"].retrieve(index_id, query, args.top_k)
+                        candidate_count = len(ranked)
                     elif variant == "hybrid":
                         ranked = components["hybrid"].retrieve(index_id, query, args.top_k)
+                        candidate_count = len(ranked)
                     else:
                         candidate_k = min(args.top_k * args.candidate_multiplier, args.max_candidates)
                         candidates = components["hybrid"].retrieve(index_id, query, candidate_k)
+                        candidate_count = len(candidates)
                         retrieval_ms = (time.perf_counter() - retrieval_started) * 1000
                         rerank_started = time.perf_counter()
                         ranked = components["reranker"].rerank(
@@ -307,7 +329,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                         "retrieval_ms": retrieval_ms,
                         "reranker_ms": reranker_ms,
                         "total_ms": total_ms,
-                        "candidate_count": len(ranked),
+                        "candidate_count": candidate_count,
+                        "returned_count": len(ranked),
                         "ranked": _ranked_payload(ranked),
                     }
                     raw_file.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -341,7 +364,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "header_enabled": args.header_enabled,
                 "python": platform.python_version(),
                 "platform": platform.platform(),
-                "latency_method": "time.perf_counter; warm model; sequential per-question execution",
+                "latency_method": (
+                    "time.perf_counter; embedding and BM25 lazy-load paths warmed; "
+                    "cross-encoder loaded before timing; sequential per-question execution"
+                ),
                 "cache_state": "persistent SQLite cache; see output directory",
             },
             "index": index_metadata,
