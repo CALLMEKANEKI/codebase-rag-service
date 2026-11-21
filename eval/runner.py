@@ -226,6 +226,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     )
     embedder = CachedEmbedder(embedder_base, cache)
     store = QdrantVectorStore(path=qdrant_path)
+    reranker = CrossEncoderReranker(args.reranker_model, device=args.reranker_device)
     bm25_root.mkdir(parents=True, exist_ok=True)
 
     index_metadata: dict[str, Any] = {}
@@ -253,7 +254,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "dense": dense,
                 "bm25": bm25,
                 "hybrid": hybrid,
-                "reranker": CrossEncoderReranker(args.reranker_model, device=args.reranker_device),
+                "reranker": reranker,
             }
             index_metadata[repo_id] = {
                 "index_id": index_id,
@@ -261,7 +262,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "chunks": len(chunks),
                 "build_ms": build_ms,
                 "bm25_index_bytes": (bm25_root / index_id / "bm25.sqlite3").stat().st_size,
-                "dense_index_bytes": _directory_size(qdrant_path),
+                "dense_store_bytes_after_index": _directory_size(qdrant_path),
                 "embedding_model": embedder.model_name,
                 "embedding_device": embedder_base.device,
             }
@@ -279,8 +280,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
         # Load the cross-encoder before timing queries so every reranker query is warm.
         reranker_load_started = time.perf_counter()
-        for item in retrievers.values():
-            item["reranker"]._get_scorer()
+        reranker._get_scorer()
         reranker_load_ms = (time.perf_counter() - reranker_load_started) * 1000
 
         raw_rows: list[dict[str, Any]] = []
