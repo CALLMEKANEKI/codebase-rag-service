@@ -76,7 +76,9 @@ def run_indexing(
                     source_text = decode_source(source_bytes, relative)
                     symbol_docs = {
                         item["qualname"]: item["doc_first_line"]
-                        for item in symbols_for_source(source_text, repo="", file_path=relative)
+                        for item in symbols_for_source(
+                            source_text, repo="", file_path=relative
+                        )
                         if item.get("doc_first_line")
                     }
                     parsed_chunks = chunk_python_bytes(
@@ -119,7 +121,9 @@ def run_indexing(
             index_root / "bm25.sqlite3",
             [
                 json.loads(line)
-                for line in (index_root / "chunks.jsonl").read_text(encoding="utf-8").splitlines()
+                for line in (index_root / "chunks.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
                 if line.strip()
             ],
         )
