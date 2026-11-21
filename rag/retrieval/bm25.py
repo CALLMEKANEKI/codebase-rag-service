@@ -148,7 +148,9 @@ class BM25Index:
                         continue
                     document_frequency = frequencies[term]
                     inverse_frequency = math.log(
-                        1.0 + (count - document_frequency + 0.5) / (document_frequency + 0.5)
+                        1.0
+                        + (count - document_frequency + 0.5)
+                        / (document_frequency + 0.5)
                     )
                     denominator = frequency + self.k1 * (
                         1.0 - self.b + self.b * length / max(average_length, 1.0)
