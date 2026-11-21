@@ -60,8 +60,30 @@ def ndcg_at_k(
     gold = list(relevant)
     if not gold:
         return 0.0
-    gains = [1.0 if is_relevant(item.chunk, gold) else 0.0 for item in ranked[:k]]
+    unique_gold = {
+        (item.get("file_path"), item.get("start_line"), item.get("end_line"))
+        for item in gold
+    }
+    matched: set[tuple[Any, Any, Any]] = set()
+    gains: list[float] = []
+    for result in ranked[:k]:
+        newly_matched = {
+            key
+            for key in unique_gold - matched
+            if is_relevant(
+                result.chunk,
+                [
+                    {
+                        "file_path": key[0],
+                        "start_line": key[1],
+                        "end_line": key[2],
+                    }
+                ],
+            )
+        }
+        gains.append(1.0 if newly_matched else 0.0)
+        matched.update(newly_matched)
     dcg = sum(gain / math.log2(rank + 1) for rank, gain in enumerate(gains, start=1))
-    ideal_hits = min(len(gold), k)
+    ideal_hits = min(len(unique_gold), k)
     ideal = sum(1.0 / math.log2(rank + 1) for rank in range(1, ideal_hits + 1))
     return dcg / ideal if ideal else 0.0
