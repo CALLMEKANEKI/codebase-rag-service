@@ -16,6 +16,7 @@ from rag.ingestion.filters import (
 )
 from rag.ingestion.snapshot import create_snapshot
 from rag.parsing.chunking import chunk_python_bytes
+from rag.retrieval.bm25 import BM25Index
 from rag.vectorstore.base import VectorStore
 
 MAX_CHUNKS = 20_000
@@ -100,6 +101,14 @@ def run_indexing(
             raise ValueError("Repository contains no indexable Python chunks")
         IndexingService(embedder, store).index_jsonl(
             index_id, index_root / "chunks.jsonl", batch_size=32
+        )
+        BM25Index.build(
+            index_root / "bm25.sqlite3",
+            [
+                json.loads(line)
+                for line in (index_root / "chunks.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ],
         )
         check_cancelled()
 
