@@ -17,9 +17,7 @@ class QueryResult:
 
 
 class QueryService:
-    def __init__(
-        self, retriever: Any, language_model: LanguageModel
-    ) -> None:
+    def __init__(self, retriever: Any, language_model: LanguageModel) -> None:
         self.retriever = retriever
         self.language_model = language_model
 
@@ -38,7 +36,12 @@ class QueryService:
                 answer="I could not find enough evidence in the indexed repository to answer that question.",
                 citations=[],
                 usage=None,
-                debug={"mode": getattr(self.retriever, "mode", "dense"), "retrieved": []} if debug else None,
+                debug={
+                    "mode": getattr(self.retriever, "mode", "dense"),
+                    "retrieved": [],
+                }
+                if debug
+                else None,
             )
 
         generated = self.language_model.generate(
