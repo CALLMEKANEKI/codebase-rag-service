@@ -118,14 +118,24 @@ def _aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             values = [row["metrics"][metric] for row in answerable]
             result[metric] = statistics.fmean(values) if values else None
         for latency_key in ("retrieval_ms", "reranker_ms", "total_ms"):
-            values = [row[latency_key] for row in group if row[latency_key] is not None]
+            values = [
+                row[latency_key]
+                for row in group
+                if row[latency_key] is not None
+            ]
             result[f"{latency_key}_p50"] = _percentile(values, 0.50)
             result[f"{latency_key}_p95"] = _percentile(values, 0.95)
         return result
 
-    output: dict[str, Any] = {"overall": summarize(rows), "by_repo": {}, "by_category": {}}
+    output: dict[str, Any] = {
+        "overall": summarize(rows),
+        "by_repo": {},
+        "by_category": {},
+    }
     for key in sorted({row["repo"] for row in rows}):
-        output["by_repo"][key] = summarize([row for row in rows if row["repo"] == key])
+        output["by_repo"][key] = summarize(
+            [row for row in rows if row["repo"] == key]
+        )
     for key in sorted({row["category"] for row in rows}):
         output["by_category"][key] = summarize(
             [row for row in rows if row["category"] == key]
@@ -208,7 +218,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             raise ConfigurationError(f"unsupported repo in dataset: {repo_id}")
         if repo_roots[repo_id] is None:
             raise ConfigurationError(f"missing local checkout for {repo_id}")
-        verify_checkout(repo_roots[repo_id], profiles[repo_id].commit_sha, profiles[repo_id])
+        verify_checkout(
+            repo_roots[repo_id], profiles[repo_id].commit_sha, profiles[repo_id]
+        )
 
     output_dir = args.output.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -261,7 +273,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "files": file_count,
                 "chunks": len(chunks),
                 "build_ms": build_ms,
-                "bm25_index_bytes": (bm25_root / index_id / "bm25.sqlite3").stat().st_size,
+                "bm25_index_bytes": (bm25_root / index_id / "bm25.sqlite3")
+                .stat()
+                .st_size,
                 "dense_store_bytes_after_index": _directory_size(qdrant_path),
                 "embedding_model": embedder.model_name,
                 "embedding_device": embedder_base.device,
@@ -269,7 +283,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
         # Warm lazy BM25 loading and the embedding path before collecting latency.
         first_question_by_repo = {
-            repo_id: next(row["question"] for row in records if row["repo"] == repo_id)
+            repo_id: next(
+                row["question"] for row in records if row["repo"] == repo_id
+            )
             for repo_id in active_repos
         }
         for repo_id, question in first_question_by_repo.items():
@@ -297,16 +313,24 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     reranker_ms = None
                     candidate_count = 0
                     if variant == "dense":
-                        ranked = components["dense"].retrieve(index_id, query, args.top_k)
+                        ranked = components["dense"].retrieve(
+                            index_id, query, args.top_k
+                        )
                         candidate_count = len(ranked)
                     elif variant == "bm25":
-                        ranked = components["bm25"].retrieve(index_id, query, args.top_k)
+                        ranked = components["bm25"].retrieve(
+                            index_id, query, args.top_k
+                        )
                         candidate_count = len(ranked)
                     elif variant == "hybrid":
-                        ranked = components["hybrid"].retrieve(index_id, query, args.top_k)
+                        ranked = components["hybrid"].retrieve(
+                            index_id, query, args.top_k
+                        )
                         candidate_count = len(ranked)
                     else:
-                        candidate_k = min(args.top_k * args.candidate_multiplier, args.max_candidates)
+                        candidate_k = min(
+                            args.top_k * args.candidate_multiplier, args.max_candidates
+                        )
                         candidates = components["hybrid"].retrieve(
                             index_id, query, candidate_k
                         )
