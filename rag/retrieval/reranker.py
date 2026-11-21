@@ -55,7 +55,11 @@ class CrossEncoderReranker:
                     part
                     for part in (
                         str(item.chunk.get("file_path") or ""),
-                        str(item.chunk.get("qualname") or item.chunk.get("symbol_name") or ""),
+                        str(
+                            item.chunk.get("qualname")
+                            or item.chunk.get("symbol_name")
+                            or ""
+                        ),
                         str(item.chunk.get("text") or ""),
                     )
                     if part
@@ -82,7 +86,14 @@ class RerankingRetriever:
 
     mode = "hybrid_rerank"
 
-    def __init__(self, retriever, reranker: CrossEncoderReranker, *, candidate_multiplier: int = 4, max_candidates: int = 50):
+    def __init__(
+        self,
+        retriever,
+        reranker: CrossEncoderReranker,
+        *,
+        candidate_multiplier: int = 4,
+        max_candidates: int = 50,
+    ):
         if candidate_multiplier < 1 or max_candidates < 1:
             raise ValueError("candidate limits must be positive")
         self.retriever = retriever
