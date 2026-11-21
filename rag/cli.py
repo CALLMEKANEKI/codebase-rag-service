@@ -14,8 +14,8 @@ from rag.ingestion.clone import clone_repository, resolve_commit_sha
 from rag.ingestion.filters import FilterLimits, enumerate_python_files
 from rag.ingestion.snapshot import create_snapshot
 from rag.parsing.chunking import CHUNKER_VERSION, chunk_python_bytes
-from rag.retrieval.dense import DenseRetriever
 from rag.retrieval.bm25 import BM25Index
+from rag.retrieval.dense import DenseRetriever
 from rag.vectorstore.qdrant_store import QdrantVectorStore
 
 MAX_CHUNKS = 20_000
