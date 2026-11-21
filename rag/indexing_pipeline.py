@@ -16,6 +16,7 @@ from rag.ingestion.filters import (
 )
 from rag.ingestion.snapshot import create_snapshot
 from rag.parsing.chunking import chunk_python_bytes
+from rag.parsing.python_ast import decode_source, symbols_for_source
 from rag.retrieval.bm25 import BM25Index
 from rag.vectorstore.base import VectorStore
 
@@ -71,15 +72,24 @@ def run_indexing(
                 for position, relative in enumerate(report.files, start=1):
                     check_cancelled()
                     path = index_root / "snapshot" / relative
-                    chunks.extend(
-                        chunk_python_bytes(
-                            path.read_bytes(),
-                            index_id=index_id,
-                            commit_sha=commit_sha,
-                            file_path=relative,
-                            strategy="code",
-                        )
+                    source_bytes = path.read_bytes()
+                    source_text = decode_source(source_bytes, relative)
+                    symbol_docs = {
+                        item["qualname"]: item["doc_first_line"]
+                        for item in symbols_for_source(source_text, repo="", file_path=relative)
+                        if item.get("doc_first_line")
+                    }
+                    parsed_chunks = chunk_python_bytes(
+                        source_bytes,
+                        index_id=index_id,
+                        commit_sha=commit_sha,
+                        file_path=relative,
+                        strategy="code",
                     )
+                    for parsed_chunk in parsed_chunks:
+                        chunk_data = parsed_chunk.to_dict()
+                        chunk_data["doc_first_line"] = symbol_docs.get(parsed_chunk.qualname)
+                        chunks.append(type("ChunkRecord", (), {"to_dict": lambda self, data=chunk_data: data})())
                     if len(chunks) > MAX_CHUNKS:
                         raise RepositoryLimitError(
                             f"Repository exceeds max_chunks={MAX_CHUNKS}"
