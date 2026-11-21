@@ -15,6 +15,7 @@ from rag.ingestion.filters import FilterLimits, enumerate_python_files
 from rag.ingestion.snapshot import create_snapshot
 from rag.parsing.chunking import CHUNKER_VERSION, chunk_python_bytes
 from rag.retrieval.dense import DenseRetriever
+from rag.retrieval.bm25 import BM25Index
 from rag.vectorstore.qdrant_store import QdrantVectorStore
 
 MAX_CHUNKS = 20_000
@@ -120,6 +121,12 @@ def index_chunks(args: argparse.Namespace) -> int:
             args.chunks_path,
             batch_size=args.batch_size,
         )
+        chunks = [
+            json.loads(line)
+            for line in Path(args.chunks_path).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        BM25Index.build(Path(args.qdrant_path).parent / "indexes" / args.index_id / "bm25.sqlite3", chunks)
         print(
             json.dumps(
                 {
