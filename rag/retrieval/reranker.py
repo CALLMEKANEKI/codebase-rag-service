@@ -75,3 +75,22 @@ class CrossEncoderReranker:
             RetrievedChunk(chunk=item.chunk, score=score, rank=rank)
             for rank, (item, score) in enumerate(ordered[:top_k], start=1)
         ]
+
+
+class RerankingRetriever:
+    """Apply a cross-encoder to a bounded candidate pool from another retriever."""
+
+    mode = "hybrid_rerank"
+
+    def __init__(self, retriever, reranker: CrossEncoderReranker, *, candidate_multiplier: int = 4, max_candidates: int = 50):
+        if candidate_multiplier < 1 or max_candidates < 1:
+            raise ValueError("candidate limits must be positive")
+        self.retriever = retriever
+        self.reranker = reranker
+        self.candidate_multiplier = candidate_multiplier
+        self.max_candidates = max_candidates
+
+    def retrieve(self, index_id: str, query: str, top_k: int = 10):
+        candidates_k = min(top_k * self.candidate_multiplier, self.max_candidates)
+        candidates = self.retriever.retrieve(index_id, query, top_k=candidates_k)
+        return self.reranker.rerank(query, candidates, top_k=top_k)
