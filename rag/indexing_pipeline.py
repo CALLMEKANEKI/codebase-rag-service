@@ -16,6 +16,8 @@ from rag.ingestion.filters import (
 )
 from rag.ingestion.snapshot import create_snapshot
 from rag.parsing.chunking import chunk_python_bytes
+from rag.parsing.python_ast import decode_source, symbols_for_source
+from rag.retrieval.bm25 import BM25Index
 from rag.vectorstore.base import VectorStore
 
 MAX_CHUNKS = 20_000
@@ -70,14 +72,28 @@ def run_indexing(
                 for position, relative in enumerate(report.files, start=1):
                     check_cancelled()
                     path = index_root / "snapshot" / relative
-                    chunks.extend(
-                        chunk_python_bytes(
-                            path.read_bytes(),
-                            index_id=index_id,
-                            commit_sha=commit_sha,
-                            file_path=relative,
-                            strategy="code",
+                    source_bytes = path.read_bytes()
+                    source_text = decode_source(source_bytes, relative)
+                    symbol_docs = {
+                        item["qualname"]: item["doc_first_line"]
+                        for item in symbols_for_source(
+                            source_text, repo="", file_path=relative
                         )
+                        if item.get("doc_first_line")
+                    }
+                    parsed_chunks = chunk_python_bytes(
+                        source_bytes,
+                        index_id=index_id,
+                        commit_sha=commit_sha,
+                        file_path=relative,
+                        strategy="code",
+                    )
+                    chunks.extend(
+                        {
+                            **parsed_chunk.to_dict(),
+                            "doc_first_line": symbol_docs.get(parsed_chunk.qualname),
+                        }
+                        for parsed_chunk in parsed_chunks
                     )
                     if len(chunks) > MAX_CHUNKS:
                         raise RepositoryLimitError(
@@ -85,7 +101,7 @@ def run_indexing(
                         )
                     update_status(files_done=position)
                 for chunk in chunks:
-                    stream.write(json.dumps(chunk.to_dict(), ensure_ascii=False) + "\n")
+                    stream.write(json.dumps(chunk, ensure_ascii=False) + "\n")
 
             manifest["stats"]["chunks"] = len(chunks)
             (index_root / "manifest.json").write_text(
@@ -100,6 +116,16 @@ def run_indexing(
             raise ValueError("Repository contains no indexable Python chunks")
         IndexingService(embedder, store).index_jsonl(
             index_id, index_root / "chunks.jsonl", batch_size=32
+        )
+        BM25Index.build(
+            index_root / "bm25.sqlite3",
+            [
+                json.loads(line)
+                for line in (index_root / "chunks.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
+                if line.strip()
+            ],
         )
         check_cancelled()
 

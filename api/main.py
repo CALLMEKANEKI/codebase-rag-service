@@ -28,7 +28,10 @@ from rag.index_registry import IndexRegistry
 from rag.indexing_pipeline import IndexCancelled, run_indexing
 from rag.ingestion.clone import validate_repo_url
 from rag.parsing.chunking import CHUNKER_VERSION
+from rag.retrieval.bm25 import BM25Retriever
 from rag.retrieval.dense import DenseRetriever
+from rag.retrieval.hybrid import HybridRetriever
+from rag.retrieval.reranker import CrossEncoderReranker, RerankingRetriever
 from rag.vectorstore.qdrant_store import QdrantVectorStore
 
 
@@ -451,12 +454,19 @@ def create_app(
 
     @app.post("/v1/query", dependencies=[Depends(require_api_key)])
     async def query(payload: QueryRequest, request: Request):
-        if payload.options.mode != "dense" or payload.options.rerank:
+        if payload.options.mode not in {"dense", "hybrid"}:
             raise APIError(
                 422,
                 "INVALID_REQUEST",
-                "Only dense retrieval with rerank=false is supported",
-                {"field": "options"},
+                "Retrieval mode must be dense or hybrid",
+                {"field": "options.mode"},
+            )
+        if payload.options.rerank and payload.options.mode != "hybrid":
+            raise APIError(
+                422,
+                "INVALID_REQUEST",
+                "Reranking requires hybrid retrieval",
+                {"field": "options.rerank"},
             )
 
         index_root = (
@@ -482,6 +492,23 @@ def create_app(
         service = request.app.state.query_service
         if service is None:
             service = _get_query_service(request.app)
+        if payload.options.mode == "hybrid":
+            bm25_path = index_root / "bm25.sqlite3"
+            if not bm25_path.is_file():
+                raise APIError(
+                    409,
+                    "INDEX_NOT_READY",
+                    "The lexical index is not available for this repository",
+                    {"status": "bm25_missing"},
+                )
+            hybrid = HybridRetriever(
+                service.retriever,
+                BM25Retriever(Path(request.app.state.settings.index_storage_path)),
+            )
+            retriever = hybrid
+            if payload.options.rerank:
+                retriever = RerankingRetriever(hybrid, CrossEncoderReranker())
+            service = QueryService(retriever, service.language_model)
         runtime = request.app.state.embedding_runtime
         store = runtime[1] if runtime is not None else None
         if store is not None and not store.collection_exists(payload.index_id):
