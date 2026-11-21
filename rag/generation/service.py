@@ -19,7 +19,7 @@ class QueryResult:
 
 class QueryService:
     def __init__(
-        self, retriever: DenseRetriever, language_model: LanguageModel
+        self, retriever: Any, language_model: LanguageModel
     ) -> None:
         self.retriever = retriever
         self.language_model = language_model
@@ -39,7 +39,7 @@ class QueryService:
                 answer="I could not find enough evidence in the indexed repository to answer that question.",
                 citations=[],
                 usage=None,
-                debug={"mode": "dense", "retrieved": []} if debug else None,
+                debug={"mode": getattr(self.retriever, "mode", "dense"), "retrieved": []} if debug else None,
             )
 
         generated = self.language_model.generate(
@@ -57,7 +57,7 @@ class QueryService:
         if debug:
             included_chunk_ids = {id(source.chunk) for source in context.sources}
             debug_info = {
-                "mode": "dense",
+                "mode": getattr(self.retriever, "mode", "dense"),
                 "retrieved": [
                     {
                         "chunk_id": str(item.chunk.get("chunk_id") or ""),
