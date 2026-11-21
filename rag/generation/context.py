@@ -35,6 +35,9 @@ def build_context(results: list[Any], *, max_chars: int = 48_000) -> BuiltContex
         header = f"[{ref_id}] {path}:{start}-{end}"
         if symbol:
             header += f" ({symbol})"
+        docstring = str(chunk.get("doc_first_line") or "").strip()
+        if docstring:
+            header += f" — {docstring}"
         block = f"{header}\n{body.strip()}"
         separator_size = 2 if blocks else 0
         remaining = max_chars - used - separator_size
