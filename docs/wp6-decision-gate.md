@@ -8,7 +8,7 @@ Status: **Development retrieval benchmark completed; feature-freeze and deployme
 - [x] R24 RRF unit tests pass.
 - [x] R25 development-set Dense vs BM25 vs Hybrid results are recorded.
 - [x] R27 Hybrid vs Hybrid + reranker results are recorded, including latency.
-- [ ] R28 context-header ablation is recorded.
+- [ ] R28 context-header ablation results are recorded; the fixed-ranking ablation implementation and CI tests are complete, while the Dev experiment is pending.
 - [x] Existing API contract conformance remains unchanged.
 - [x] CI, lint, formatting, and unit tests pass.
 - [ ] Local startup, index lifecycle, and query smoke tests pass.
@@ -114,9 +114,19 @@ validation; do not enable the cross-encoder by default.
 
 ## R28 and deployment decision
 
-R28 context-header ablation has not been run. The current run used
-`header_enabled=false`; it did not compare header-on versus header-off and did
-not evaluate answer/citation quality.
+R28 implementation is present in `rag/generation/context.py` and
+`eval/runner.py`. For each Dev question, the runner obtains one Hybrid top-k
+ranking and builds both variants from that exact ranking:
+- Header disabled: citation markers only (`[1]`, `[2]`, ...).
+- Header enabled: citation marker plus file path, inclusive line range, symbol,
+  and first docstring line when available.
+
+Per-question measurements are written to `context_ablation_raw.jsonl`;
+aggregate character/source/truncation measurements are included in
+`retrieval_summary.json`. Default context budget is 48,000 characters.
+Token counts are not measured by this runner. The current workflow execution
+is pending; do not report R28 measurements until its artifact is available.
+No LLM answer or citation-quality evaluation is performed.
 
 Do not claim that Hybrid or reranking improves all retrieval quality measures.
 Keep the held-out Test split reserved for the separately approved final
