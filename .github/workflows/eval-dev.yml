@@ -9,6 +9,8 @@ on:
       - work/wp6-retrieval-reranking
     paths:
       - .github/workflows/eval-dev.yml
+      - eval/runner.py
+      - eval/metrics.py
   workflow_dispatch:
 
 jobs:
