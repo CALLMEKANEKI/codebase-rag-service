@@ -118,11 +118,7 @@ def _aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             values = [row["metrics"][metric] for row in answerable]
             result[metric] = statistics.fmean(values) if values else None
         for latency_key in ("retrieval_ms", "reranker_ms", "total_ms"):
-            values = [
-                row[latency_key]
-                for row in group
-                if row[latency_key] is not None
-            ]
+            values = [row[latency_key] for row in group if row[latency_key] is not None]
             result[f"{latency_key}_p50"] = _percentile(values, 0.50)
             result[f"{latency_key}_p95"] = _percentile(values, 0.95)
         return result
@@ -133,9 +129,7 @@ def _aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "by_category": {},
     }
     for key in sorted({row["repo"] for row in rows}):
-        output["by_repo"][key] = summarize(
-            [row for row in rows if row["repo"] == key]
-        )
+        output["by_repo"][key] = summarize([row for row in rows if row["repo"] == key])
     for key in sorted({row["category"] for row in rows}):
         output["by_category"][key] = summarize(
             [row for row in rows if row["category"] == key]
@@ -283,9 +277,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
         # Warm lazy BM25 loading and the embedding path before collecting latency.
         first_question_by_repo = {
-            repo_id: next(
-                row["question"] for row in records if row["repo"] == repo_id
-            )
+            repo_id: next(row["question"] for row in records if row["repo"] == repo_id)
             for repo_id in active_repos
         }
         for repo_id, question in first_question_by_repo.items():
