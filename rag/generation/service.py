@@ -6,7 +6,6 @@ from typing import Any
 from rag.generation.base import LanguageModel
 from rag.generation.citations import validate_citations
 from rag.generation.context import build_context
-from rag.retrieval.dense import DenseRetriever
 
 
 @dataclass(frozen=True)
