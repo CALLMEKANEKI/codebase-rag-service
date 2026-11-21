@@ -23,7 +23,6 @@ def test_retrieval_metrics_use_overlapping_line_ranges():
     assert 0 < ndcg_at_k(ranked, relevant, 2) < 1
 
 
-
 def test_ndcg_does_not_count_duplicate_chunks_for_the_same_ground_truth():
     ranked = [
         Result({"file_path": "a.py", "start_line": 10, "end_line": 20}),
