@@ -19,14 +19,18 @@ def is_relevant(chunk: dict[str, Any], relevant: Iterable[dict[str, Any]]) -> bo
     return False
 
 
-def hit_at_k(ranked: Sequence[Any], relevant: Iterable[dict[str, Any]], k: int) -> float:
+def hit_at_k(
+    ranked: Sequence[Any], relevant: Iterable[dict[str, Any]], k: int
+) -> float:
     if k < 1:
         raise ValueError("k must be positive")
     gold = list(relevant)
     return float(any(is_relevant(item.chunk, gold) for item in ranked[:k]))
 
 
-def recall_at_k(ranked: Sequence[Any], relevant: Iterable[dict[str, Any]], k: int) -> float:
+def recall_at_k(
+    ranked: Sequence[Any], relevant: Iterable[dict[str, Any]], k: int
+) -> float:
     if k < 1:
         raise ValueError("k must be positive")
     gold = list(relevant)
@@ -48,7 +52,9 @@ def reciprocal_rank(ranked: Sequence[Any], relevant: Iterable[dict[str, Any]]) -
     return 0.0
 
 
-def ndcg_at_k(ranked: Sequence[Any], relevant: Iterable[dict[str, Any]], k: int) -> float:
+def ndcg_at_k(
+    ranked: Sequence[Any], relevant: Iterable[dict[str, Any]], k: int
+) -> float:
     if k < 1:
         raise ValueError("k must be positive")
     gold = list(relevant)
