@@ -86,17 +86,20 @@ def run_indexing(
                         file_path=relative,
                         strategy="code",
                     )
-                    for parsed_chunk in parsed_chunks:
-                        chunk_data = parsed_chunk.to_dict()
-                        chunk_data["doc_first_line"] = symbol_docs.get(parsed_chunk.qualname)
-                        chunks.append(type("ChunkRecord", (), {"to_dict": lambda self, data=chunk_data: data})())
+                    chunks.extend(
+                        {
+                            **parsed_chunk.to_dict(),
+                            "doc_first_line": symbol_docs.get(parsed_chunk.qualname),
+                        }
+                        for parsed_chunk in parsed_chunks
+                    )
                     if len(chunks) > MAX_CHUNKS:
                         raise RepositoryLimitError(
                             f"Repository exceeds max_chunks={MAX_CHUNKS}"
                         )
                     update_status(files_done=position)
                 for chunk in chunks:
-                    stream.write(json.dumps(chunk.to_dict(), ensure_ascii=False) + "\n")
+                    stream.write(json.dumps(chunk, ensure_ascii=False) + "\n")
 
             manifest["stats"]["chunks"] = len(chunks)
             (index_root / "manifest.json").write_text(
