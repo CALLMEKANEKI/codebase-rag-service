@@ -103,3 +103,28 @@ def test_context_never_partially_truncates_citable_chunks():
 
     assert context.text == ""
     assert context.sources == ()
+
+
+def test_context_header_can_be_disabled_without_losing_citation_markers():
+    item = chunk()
+    item["doc_first_line"] = "Dispatches an incoming request."
+    context = build_context(
+        [RetrievedChunk(item, 0.9, 1)],
+        include_header=False,
+    )
+
+    assert context.text.startswith("[1]\\ndef dispatch_request")
+    assert "src/app.py" not in context.text
+    assert "dispatch_request (" not in context.text
+    assert context.sources[0].ref_id == 1
+
+
+def test_context_reports_sources_truncated_by_character_budget():
+    results = [
+        RetrievedChunk(chunk("c1", "x" * 100), 0.9, 1),
+        RetrievedChunk(chunk("c2", "y" * 100), 0.8, 2),
+    ]
+    context = build_context(results, max_chars=80, include_header=False)
+
+    assert context.sources == ()
+    assert context.truncated_sources == 2
