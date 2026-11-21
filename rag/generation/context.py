@@ -15,38 +15,56 @@ class ContextSource:
 class BuiltContext:
     text: str
     sources: tuple[ContextSource, ...]
+    truncated_sources: int = 0
 
 
-def build_context(results: list[Any], *, max_chars: int = 48_000) -> BuiltContext:
-    """Build a bounded, numbered context from retrieved chunks."""
+def build_context(
+    results: list[Any],
+    *,
+    max_chars: int = 48_000,
+    include_header: bool = True,
+) -> BuiltContext:
+    """Build a bounded, numbered context from retrieved chunks.
+
+    When include_header is false, retain only the citation marker (for example
+    [1]) and omit file path, line range, symbol, and docstring metadata.
+    """
     blocks: list[str] = []
     sources: list[ContextSource] = []
     used = 0
-    for result in results:
+    truncated_sources = 0
+    for position, result in enumerate(results):
         chunk = result.chunk
         body = str(chunk.get("text") or "")
         if not body.strip():
             continue
         ref_id = len(sources) + 1
-        path = str(chunk.get("file_path") or "unknown")
-        start = int(chunk.get("start_line") or 1)
-        end = int(chunk.get("end_line") or start)
-        symbol = chunk.get("qualname") or chunk.get("symbol_name")
-        header = f"[{ref_id}] {path}:{start}-{end}"
-        if symbol:
-            header += f" ({symbol})"
-        docstring = str(chunk.get("doc_first_line") or "").strip()
-        if docstring:
-            header += f" — {docstring}"
+        header = f"[{ref_id}]"
+        if include_header:
+            path = str(chunk.get("file_path") or "unknown")
+            start = int(chunk.get("start_line") or 1)
+            end = int(chunk.get("end_line") or start)
+            symbol = chunk.get("qualname") or chunk.get("symbol_name")
+            header += f" {path}:{start}-{end}"
+            if symbol:
+                header += f" ({symbol})"
+            docstring = str(chunk.get("doc_first_line") or "").strip()
+            if docstring:
+                header += f" — {docstring}"
         block = f"{header}\n{body.strip()}"
         separator_size = 2 if blocks else 0
         remaining = max_chars - used - separator_size
         if remaining <= 0 or len(block) > remaining:
+            truncated_sources = sum(
+                1
+                for later in results[position:]
+                if str(later.chunk.get("text") or "").strip()
+            )
             break
         blocks.append(block)
         sources.append(ContextSource(ref_id, chunk, float(result.score)))
         used += len(block) + separator_size
-    return BuiltContext("\n\n".join(blocks), tuple(sources))
+    return BuiltContext("\n\n".join(blocks), tuple(sources), truncated_sources)
 
 
 SYSTEM_INSTRUCTION = """You answer questions about a source-code repository using only the supplied
