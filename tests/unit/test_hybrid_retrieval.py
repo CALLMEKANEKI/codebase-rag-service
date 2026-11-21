@@ -1,3 +1,4 @@
+from rag.retrieval.bm25 import BM25Index, BM25Retriever
 from rag.retrieval.dense import RetrievedChunk
 from rag.retrieval.hybrid import HybridRetriever
 
@@ -31,3 +32,22 @@ def test_rrf_deduplicates_chunks_and_validates_arguments():
     assert len(retriever.retrieve("idx", "query", 5)) == 1
     with pytest.raises(ValueError):
         retriever.retrieve("idx", " ", 5)
+
+
+def test_hybrid_retriever_fuses_persistent_bm25_results(tmp_path):
+    index_root = tmp_path / "indexes"
+    BM25Index.build(
+        index_root / "idx" / "bm25.sqlite3",
+        [
+            {
+                "chunk_id": "dispatch",
+                "text": "def dispatch_request(): pass",
+            }
+        ],
+    )
+    retriever = HybridRetriever(FakeRetriever([]), BM25Retriever(index_root))
+
+    results = retriever.retrieve("idx", "dispatchRequest", top_k=1)
+
+    assert [result.chunk["chunk_id"] for result in results] == ["dispatch"]
+    assert results[0].rank == 1

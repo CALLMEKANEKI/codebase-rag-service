@@ -11,7 +11,7 @@ from typing import Any
 
 from rag.retrieval.dense import RetrievedChunk
 
-_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*|[0-9]+|[^\\W_]+", re.UNICODE)
+_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*|[0-9]+|[^\W_]+", re.UNICODE)
 _CAMEL_BOUNDARY_1 = re.compile(r"([a-z0-9])([A-Z])")
 _CAMEL_BOUNDARY_2 = re.compile(r"([A-Z]+)([A-Z][a-z])")
 

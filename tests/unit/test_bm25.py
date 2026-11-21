@@ -2,10 +2,26 @@ from rag.retrieval.bm25 import BM25Index, tokenize_code
 
 
 def test_tokenizer_splits_snake_camel_dotted_and_acronyms():
-    tokens = tokenize_code("dispatch_request MyHTTPClient.handleRequest")
+    tokens = tokenize_code(
+        "dispatch_request camelCase PascalCase HTTPClient "
+        "MyHTTPClient.handleRequest module.ClassName"
+    )
     assert "dispatch_request" in tokens
-    assert {"dispatch", "request", "my", "http", "client", "handle"} <= set(tokens)
-    assert "handle" in tokens
+    assert {
+        "dispatch",
+        "request",
+        "camel",
+        "case",
+        "pascal",
+        "http",
+        "client",
+        "my",
+        "handle",
+        "module",
+        "class",
+        "name",
+    } <= set(tokens)
+    assert all(not any(char.isspace() for char in token) for token in tokens)
 
 
 def test_bm25_ranks_identifier_match_and_persists(tmp_path):
@@ -24,6 +40,7 @@ def test_bm25_ranks_identifier_match_and_persists(tmp_path):
     ]
     index = BM25Index.build(path, chunks)
     results = index.retrieve("dispatchRequest", top_k=2)
+    assert results
     assert results[0].chunk["chunk_id"] == "a"
     reopened = BM25Index(path).retrieve("dispatch request", top_k=1)
     assert reopened[0].chunk["chunk_id"] == "a"
