@@ -23,8 +23,8 @@ from eval.tools.corpus import (
 )
 from eval.tools.symbols import decode_source, symbols_for_source
 from rag.embeddings.cache import CachedEmbedder, SQLiteEmbeddingCache
-from rag.generation.context import build_context
 from rag.embeddings.sentence_transformer import SentenceTransformerEmbedder
+from rag.generation.context import build_context
 from rag.parsing.chunking import CHUNKER_VERSION, chunk_python_bytes
 from rag.retrieval.bm25 import BM25Index, BM25Retriever
 from rag.retrieval.dense import DenseRetriever
