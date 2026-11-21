@@ -54,7 +54,7 @@ class BM25Index:
         *,
         k1: float = 1.5,
         b: float = 0.75,
-    ) -> "BM25Index":
+    ) -> BM25Index:
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         connection = sqlite3.connect(target)
