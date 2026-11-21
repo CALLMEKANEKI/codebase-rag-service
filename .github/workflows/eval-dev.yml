@@ -11,6 +11,9 @@ on:
       - .github/workflows/eval-dev.yml
       - eval/runner.py
       - eval/metrics.py
+      - rag/generation/context.py
+      - tests/test_generation.py
+      - eval/retrieval_experiment_protocol.md
   workflow_dispatch:
 
 jobs:
