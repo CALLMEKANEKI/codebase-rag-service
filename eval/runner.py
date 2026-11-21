@@ -357,6 +357,72 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     raw_file.write(json.dumps(row, ensure_ascii=False) + "\n")
                     raw_rows.append(row)
 
+        # R28: build both contexts from one identical Hybrid ranking.
+        for record in records:
+            repo_id = record["repo"]
+            components = retrievers[repo_id]
+            context_ranked = components["hybrid"].retrieve(
+                components["index_id"], record["question"], args.top_k
+            )
+            ranked_ids = [
+                str(item.chunk.get("chunk_id") or "") for item in context_ranked
+            ]
+            for header_enabled in (False, True):
+                built = build_context(
+                    context_ranked,
+                    max_chars=args.context_max_chars,
+                    include_header=header_enabled,
+                )
+                context_rows.append(
+                    {
+                        "question_id": record["id"],
+                        "repo": repo_id,
+                        "category": record["category"],
+                        "header_enabled": header_enabled,
+                        "max_chars": args.context_max_chars,
+                        "context_chars": len(built.text),
+                        "included_source_count": len(built.sources),
+                        "truncated_source_count": built.truncated_sources,
+                        "retrieved_chunk_ids": ranked_ids,
+                        "included_chunk_ids": [
+                            str(source.chunk.get("chunk_id") or "")
+                            for source in built.sources
+                        ],
+                        "token_count": None,
+                    }
+                )
+
+        with context_raw_path.open(
+            "w", encoding="utf-8", newline="\\n"
+        ) as context_file:
+            for row in context_rows:
+                context_file.write(json.dumps(row, ensure_ascii=False) + "\\n")
+
+        context_summary: dict[str, Any] = {}
+        for header_enabled in (False, True):
+            group = [
+                row for row in context_rows if row["header_enabled"] is header_enabled
+            ]
+            context_summary[
+                "header_enabled" if header_enabled else "header_disabled"
+            ] = {
+                "questions": len(group),
+                "max_chars": args.context_max_chars,
+                "mean_context_chars": statistics.fmean(
+                    row["context_chars"] for row in group
+                ),
+                "mean_included_sources": statistics.fmean(
+                    row["included_source_count"] for row in group
+                ),
+                "total_truncated_sources": sum(
+                    row["truncated_source_count"] for row in group
+                ),
+                "questions_with_truncation": sum(
+                    row["truncated_source_count"] > 0 for row in group
+                ),
+                "mean_token_count": None,
+            }
+
         summary = {
             "metadata": {
                 "created_at": datetime.now(UTC).isoformat(),
