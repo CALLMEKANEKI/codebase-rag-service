@@ -52,3 +52,48 @@ For each run, record timestamp, branch/commit SHA, dataset file and SHA-256,
 repo commit SHAs, model identifiers, parameters, device, cache state, and
 latency methodology. Store raw per-question results and aggregate metrics.
 Never fill result tables with estimates or fabricated values.
+
+
+## Running the development Eval Runner
+
+Install the development and ML dependencies, including the selected CPU or GPU
+PyTorch runtime:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements-torch-cpu.txt
+python -m pip install -r requirements-ml.txt
+```
+
+Check out the two corpus snapshots at the exact commits in
+`eval/corpus_profiles.yaml`, then run from the repository root:
+
+```powershell
+python -m eval.runner `
+  --fastapi-root "C:\GitHub\fastapi" `
+  --flask-root "C:\GitHub\flask" `
+  --device cpu
+```
+
+The runner accepts only files resolved under `eval/datasets/dev/` and rejects
+records whose `split` is not `dev`. It verifies both repository checkouts
+against their pinned commits and corpus snapshots before indexing. It builds
+the source-profile chunks and temporary local Qdrant/SQLite indexes, then
+compares Dense, BM25, Hybrid, and Hybrid + Reranker. The default dataset is
+`eval/datasets/dev/E2_Dev_24.jsonl`; select
+`--dataset eval/datasets/dev/E2_Dev_24_en.jsonl` to run the English variant
+as a separate experiment.
+
+Outputs are written to `eval/results/dev/` by default:
+`retrieval_raw.jsonl` contains per-question rankings, metrics, candidate
+counts, and timings; `retrieval_summary.json` contains macro averages,
+per-repository/category summaries, index build metadata, model/configuration
+details, and dataset SHA-256. Unanswerable questions are counted but excluded
+from relevance-ranking metric averages because they have no positive ground
+truth. The runner warms the embedding/BM25 paths and loads the cross-encoder
+before timed queries; reranker model-load time is recorded separately.
+
+This runner measures retrieval only. It does not call the LLM, score generated
+answers, perform the R28 context-header ablation, or read the held-out Test
+split. Run the two Dev dataset files separately and retain their outputs as
+separate experiment runs rather than combining the translated question sets.
