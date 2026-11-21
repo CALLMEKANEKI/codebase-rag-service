@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from rag.retrieval.dense import DenseRetriever, RetrievedChunk
 from rag.retrieval.bm25 import BM25Retriever
+from rag.retrieval.dense import DenseRetriever, RetrievedChunk
 
 
 class HybridRetriever:
