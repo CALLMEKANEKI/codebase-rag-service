@@ -4,7 +4,7 @@ from rag.retrieval.bm25 import BM25Index, tokenize_code
 def test_tokenizer_splits_snake_camel_dotted_and_acronyms():
     tokens = tokenize_code("dispatch_request MyHTTPClient.handleRequest")
     assert "dispatch_request" in tokens
-    assert {"dispatch", "request", "my", "http", "client", "handle", "request"} <= set(tokens)
+    assert {"dispatch", "request", "my", "http", "client", "handle"} <= set(tokens)
     assert "handle" in tokens
 
 
