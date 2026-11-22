@@ -12,15 +12,20 @@ from typing import Any
 from rag.retrieval.dense import RetrievedChunk
 
 _TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*|[0-9]+|[^\W_]+", re.UNICODE)
+_QUALIFIED_IDENT_RE = re.compile(
+    r"\b[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+\b"
+)
 _CAMEL_BOUNDARY_1 = re.compile(r"([a-z0-9])([A-Z])")
 _CAMEL_BOUNDARY_2 = re.compile(r"([A-Z]+)([A-Z][a-z])")
 
 
 def tokenize_code(text: str) -> list[str]:
-    """Tokenize source code identifiers while retaining full and split forms."""
+    """Tokenize code identifiers while retaining qualified and split forms."""
+    tokens = [
+        qualified.casefold() for qualified in _QUALIFIED_IDENT_RE.findall(text)
+    ]
     normalized = _CAMEL_BOUNDARY_2.sub(r"\1 \2", text)
     normalized = _CAMEL_BOUNDARY_1.sub(r"\1 \2", normalized)
-    tokens: list[str] = []
     for match in _TOKEN_RE.finditer(normalized):
         token = match.group(0).lower()
         if not token:
