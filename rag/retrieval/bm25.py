@@ -21,9 +21,7 @@ _CAMEL_BOUNDARY_2 = re.compile(r"([A-Z]+)([A-Z][a-z])")
 
 def tokenize_code(text: str) -> list[str]:
     """Tokenize code identifiers while retaining qualified and split forms."""
-    tokens = [
-        qualified.casefold() for qualified in _QUALIFIED_IDENT_RE.findall(text)
-    ]
+    tokens = [qualified.casefold() for qualified in _QUALIFIED_IDENT_RE.findall(text)]
     normalized = _CAMEL_BOUNDARY_2.sub(r"\1 \2", text)
     normalized = _CAMEL_BOUNDARY_1.sub(r"\1 \2", normalized)
     for match in _TOKEN_RE.finditer(normalized):
