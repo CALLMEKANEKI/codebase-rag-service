@@ -29,7 +29,7 @@ _VIETNAMESE_REFUSAL = re.compile(
     re.IGNORECASE,
 )
 _VIETNAMESE_CHARACTERS = re.compile(
-    r"[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủụứừửữựýỳỷỹỵ]",
+    r"[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừữựýỳỷỹỵ]",
     re.IGNORECASE,
 )
 
