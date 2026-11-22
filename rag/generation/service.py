@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from rag.generation.base import LanguageModel
-from rag.generation.citations import validate_citations
+from rag.generation.citations import no_evidence_answer, validate_citations
 from rag.generation.context import build_context
 
 
@@ -33,7 +33,7 @@ class QueryService:
         context = build_context(retrieved)
         if not context.sources:
             return QueryResult(
-                answer="I could not find enough evidence in the indexed repository to answer that question.",
+                answer=no_evidence_answer(question),
                 citations=[],
                 usage=None,
                 debug={
@@ -48,7 +48,11 @@ class QueryService:
             question=question,
             context=context.text,
         )
-        answer, citations = validate_citations(generated.text, context.sources)
+        answer, citations = validate_citations(
+            generated.text,
+            context.sources,
+            question=question,
+        )
         usage = None
         if generated.input_tokens is not None or generated.output_tokens is not None:
             usage = {
