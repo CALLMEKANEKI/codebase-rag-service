@@ -28,7 +28,7 @@ _VIETNAMESE_REFUSAL = re.compile(
     r")",
     re.IGNORECASE,
 )
-_VIETNAMESE_CHARACTERS = re.compile(r"[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừữựýỳỷỹỵ]", re.I)
+_VIETNAMESE_CHARACTERS = re.compile(r"[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừữựýỳỷỹỵ]", re.IGNORECASE)
 
 _NO_EVIDENCE_EN = (
     "I could not find enough evidence in the indexed repository to answer that question."
