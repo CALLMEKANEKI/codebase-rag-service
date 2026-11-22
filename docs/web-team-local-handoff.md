@@ -120,7 +120,21 @@ The API contract source remains `contracts/openapi.yaml`. Do not change it as pa
 - The backend is a local development integration target, not a public deployment. No uptime, public URL, or production security guarantee is implied.
 - The current Dev benchmark used 24 Vietnamese questions. The held-out Test split has not been evaluated.
 
-## 7. Local handoff checklist
+## 7. Request timeout budget
+
+Use a nested timeout budget so the caller does not cancel before the downstream component finishes:
+
+| Hop | Timeout |
+|---|---:|
+| OpenRouter generation in RAG | 60 seconds total across all configured model fallbacks |
+| Web Backend → RAG `POST /v1/query` | 65 seconds |
+| Frontend → Web Backend message request | 75 seconds |
+
+The 60-second RAG value is a total deadline for the whole OpenRouter fallback sequence, not 60 seconds per model. Each fallback attempt must use only the remaining time. Do not multiply 60 seconds by the number of configured models.
+
+Verify actual timeout settings in the Web HTTP client, reverse proxy/nginx, and frontend. Environment defaults alone are not proof that the full chain honors the budget. Do not automatically retry a query POST after it may have reached RAG.
+
+## 8. Local handoff checklist
 
 - [ ] Web developer can clone the documented branch and install dependencies.
 - [ ] Backend starts and `GET /v1/health` returns `{"status":"ok"}`.
