@@ -28,14 +28,13 @@ _VIETNAMESE_REFUSAL = re.compile(
     r")",
     re.IGNORECASE,
 )
-_VIETNAMESE_CHARACTERS = re.compile(r"[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừữựýỳỷỹỵ]", re.IGNORECASE)
+_VIETNAMESE_CHARACTERS = re.compile(
+    r"[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủụứừửữựýỳỷỹỵ]",
+    re.IGNORECASE,
+)
 
-_NO_EVIDENCE_EN = (
-    "I could not find enough evidence in the indexed repository to answer that question."
-)
-_NO_EVIDENCE_VI = (
-    "Tôi không tìm thấy đủ bằng chứng trong mã nguồn đã lập chỉ mục để trả lời câu hỏi này."
-)
+_NO_EVIDENCE_EN = "I could not find enough evidence in the indexed repository to answer that question."
+_NO_EVIDENCE_VI = "Tôi không tìm thấy đủ bằng chứng trong mã nguồn đã lập chỉ mục để trả lời câu hỏi này."
 
 
 def no_evidence_answer(question: str) -> str:
