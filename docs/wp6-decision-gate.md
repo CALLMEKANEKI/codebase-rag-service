@@ -186,3 +186,40 @@ choice to defer deployment and hand the backend to the web team for local
 integration. Keep BM25 and Hybrid as candidates, reranking optional/off by
 default, and the Test split reserved. The web team must complete the local
 smoke-test checklist before integration is considered verified.
+
+
+## Post-handoff E2E findings (2026-11-21)
+
+The web team completed local integration against the real RAG service and real OpenRouter LLM. See the [web-team E2E report](https://github.com/MinhVu309/codebase-rag-web/blob/main/docs/reports/e2e-local-2026-11-21.md).
+
+Confirmed on the tested local setup:
+- User registration/login, project creation, import of small Flask and Requests repositories, polling to ready, chat, history/conversation CRUD, citation viewer, repository deletion.
+- 18/18 query requests completed; 82/82 returned citations opened the expected file and line range.
+- Cross-user access checks returned 404 in 13/13 tested endpoint cases.
+- Flask first import about 14.7s; warm-cache import about 2.0s.
+- Query latency over 18 same-repository questions: median 10.8s; p95 25.5s (interpolated) or 32.4s (nearest-rank); max 32.4s.
+- 16/18 answers were assessed as acceptable. Citation path/line integrity is not equivalent to semantic relevance.
+
+Important limits:
+- Only two small public repositories and one free OpenRouter model were exercised.
+- No concurrent-user/load test, large-repository boundary test, or real upstream LLM error/timeout propagation test was completed.
+- Web tests (474) passed locally; the report states Web GitHub CI is billing-locked. Do not describe this as Web CI passing.
+- The reported script uses an API cookie jar. Browser-driven UI E2E should be recorded separately.
+- Hybrid with rerank=false is the only Web→RAG query mode exercised. Dense and rerank=true are not Web-E2E validated.
+- The report observed that the last imported repository becomes the project's active repository; all chats then query that repository. This is current behavior, not the desired conversation-level binding described below.
+
+### RAG quality issues to track
+
+- R1: exact method-level lookup can miss \`Session.request\` and \`Blueprint.register\`; debug traces showed the expected method chunks absent from the top five.
+- R2: no-evidence handling varies depending on whether the LLM emits valid citation markers.
+- R3: refusal/out-of-scope answers can still carry unrelated citations.
+- R4: refusal language may be English even for Vietnamese questions.
+
+R1–R4 are tracked as quality fixes. No production-quality claim is made from this 18-question sample.
+
+### Follow-up architecture and timeout decisions
+
+- D38 (proposed): a Project may contain multiple repositories, but each Conversation binds to exactly one repository/index. Messages in that conversation always query the bound index. A new conversation may select another ready repository. No cross-repository chat in one conversation for MVP. Web PostgreSQL stores business metadata; RAG retains code snapshots and retrieval indexes per index_id. This requires Web schema/API/UX review; no RAG OpenAPI change is currently required.
+- D39: timeout budget for the measured demo configuration is LLM provider 60s, Web Backend→RAG query 65s, Frontend→Web Backend message 75s. Verify every HTTP client and reverse proxy timeout, not only environment defaults. Do not automatically retry a query POST after it may have been sent. These are demo settings, not production SLOs.
+
+A separate E2E follow-up checklist is recorded in Notion page 03 — Quy ước & kiến trúc chung. The remaining checks must be completed before a deployment-readiness claim; they do not block the current local demo.
