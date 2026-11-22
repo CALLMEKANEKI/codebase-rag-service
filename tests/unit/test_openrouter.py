@@ -199,3 +199,41 @@ def test_openrouter_uses_first_model_when_it_succeeds(monkeypatch):
     assert result.text == "Answer [1]."
     assert result.input_tokens == 10
     assert result.output_tokens == 3
+
+
+def test_openrouter_fallbacks_share_one_total_timeout_budget(monkeypatch):
+    timeouts = []
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def post(self, url, **kwargs):
+            timeouts.append(kwargs["timeout"].as_dict()["read"])
+            if len(timeouts) == 1:
+                raise httpx.TimeoutException("first model consumed most of budget")
+            return FakeResponse(
+                {
+                    "model": "second/model:free",
+                    "choices": [{"message": {"content": "Fallback answer [1]."}}],
+                    "usage": {},
+                }
+            )
+
+        def close(self):
+            pass
+
+    monotonic_values = iter([100.0, 100.0, 159.0])
+    monkeypatch.setattr(module.httpx, "Client", FakeClient)
+    monkeypatch.setattr(module.time, "monotonic", lambda: next(monotonic_values))
+    llm = OpenRouterLanguageModel(
+        api_key="test-key",
+        models=["first/model:free", "second/model:free"],
+        timeout_ms=60_000,
+    )
+
+    result = llm.generate(question="question", context="[1] source")
+
+    assert result.text == "Fallback answer [1]."
+    assert timeouts[0] == pytest.approx(60.0)
+    assert timeouts[1] == pytest.approx(1.0)
