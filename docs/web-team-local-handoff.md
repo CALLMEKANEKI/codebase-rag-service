@@ -146,17 +146,18 @@ Verify actual timeout settings in the Web HTTP client, reverse proxy/nginx, and 
 Deployment remains deferred until the project owner chooses a hosting target, budget, public-access policy, and secret-management approach.
 
 
-## 9. D40 multi-repository conversation behavior
+## 9. D40 multi-repository conversation behavior — final decisions
 
-The product decision has moved beyond the earlier single-repository-per-conversation proposal. See the [D40 implementation handoff and E2E test plan](web-team-d40-implementation-and-test-plan.md) for the authoritative requirements.
+The final owner decisions and detailed acceptance matrix are in the [D40 implementation handoff and test plan](web-team-d40-implementation-and-test-plan.md).
 
-Summary:
-- A conversation starts with one READY repository; users can add/remove repositories from its persistent scope.
-- A new repository becoming READY does not automatically alter existing conversations. The Web UI must suggest adding it and wait for explicit confirmation.
-- The question composer must offer a multi-select repository focus. Empty focus means all repositories in the conversation scope; one or more selected repositories apply to that message only.
-- Web Backend must validate focus as a subset of conversation scope and resolve RAG index IDs server-side.
-- Focus must influence both retrieval and prompt semantics. Adding repository names to the prompt without retrieving evidence from those repositories does not satisfy multi-repository support.
-- Current `POST /v1/query` accepts one `index_id`. Web/RAG must review the multi-index orchestration strategy before implementation. Do not simply concatenate independently generated per-repository answers and treat that as evidence fusion.
-- Preserve repository/index provenance and per-message scope/focus snapshots for citations and history.
+- **Conversation Scope (S1):** user-managed persistent set of READY repositories. It is the hard boundary: RAG must never search a repository outside this scope.
+- **New repository:** do not auto-add it to existing conversations. Show a notification/suggestion and wait for explicit user confirmation.
+- **Repository Focus (F2):** arbitrary multi-select beside the composer, applied only to the current message. It is a **soft preference**, not a hard filter. Focused repositories receive retrieval priority; if their evidence is insufficient, RAG may expand to the remaining repositories already in Conversation Scope.
+- If fallback finds evidence outside the selected focus, disclose exactly where it was found and that the focused repositories were insufficient. If no evidence exists anywhere in scope, give a grounded no-evidence response and ask the user to verify selection or clarify whether the question is outside the indexed codebase.
+- **Architecture B:** RAG owns a Multi-Index Orchestrator: retrieve from focused indexes first, conditionally expand within the authorized scope, fuse evidence with provenance, and perform one final generation. Do not concatenate independently generated single-index answers.
+- Web Backend owns authorization, Conversation Scope, trusted repository→index resolution, and H2 per-message snapshots (scope, selected focus, actual searched indexes, outcomes and citations). Never trust client-supplied index IDs.
+- **H2:** preserve immutable message/citation snapshots after scope removal or repository deletion. Live source navigation may report the source unavailable.
+- **E2:** partial results are allowed when useful evidence exists, but unavailable/failed sources must be explicitly reported and distinguished from “searched, no evidence”.
+- Current `POST /v1/query` accepts one `index_id`. A multi-index contract proposal must be reviewed separately. Do not change `contracts/openapi.yaml` before explicit project-owner approval.
 
-The 2026-11-21 E2E report remains the historical baseline for the previous active-repository behavior. It is not an acceptance report for D40. The D40 test plan defines the new acceptance tests. No D40 implementation or E2E pass is claimed yet.
+The 2026-11-21 E2E report remains a historical baseline, not a D40 acceptance report. No D40 implementation or E2E pass is claimed yet.
