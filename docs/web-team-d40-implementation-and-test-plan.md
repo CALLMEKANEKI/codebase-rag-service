@@ -1,173 +1,249 @@
-# D40 — Web implementation handoff and test plan
+# D40 — Web implementation handoff and acceptance test plan
 
 Date: 2026-11-23  
-Status: **Product behavior decided; implementation and E2E verification pending.**  
-Related baseline: [Web ↔ real RAG local E2E report (2026-11-21)](https://github.com/MinhVu309/codebase-rag-web/blob/main/docs/reports/e2e-local-2026-11-21.md)  
-Architecture decision: D40 in Notion, page **03 — Quy ước & kiến trúc chung**.
+Status: **Product decisions confirmed; implementation and E2E verification pending.**  
+Related historical baseline: [Web ↔ real RAG local E2E report (2026-11-21)](https://github.com/MinhVu309/codebase-rag-web/blob/main/docs/reports/e2e-local-2026-11-21.md)  
+Architecture decision: D40 in Notion page **03 — Quy ước & kiến trúc chung**.
 
-## 1. Why this follow-up exists
+## 1. Purpose and baseline
 
-The 2026-11-21 E2E report tested the previous behavior in which a Project effectively had one active repository and chat followed the latest imported/active repository. That report remains a valid historical baseline. It is **not** an acceptance report for the new multi-repository conversation behavior.
+The 2026-11-21 E2E report tested the previous active-repository behavior. Keep it unchanged as historical evidence; it is not an acceptance report for D40.
 
-This document defines the implementation responsibilities and acceptance tests for D40. It does not claim that the new behavior has been implemented or tested.
+This document is the authoritative Web-team implementation request and acceptance-test plan for D40. It records the owner's final choices and expected behavior. It does not claim that implementation or tests have been completed.
 
-## 2. Product behavior — authoritative decisions
+## 2. Final product decisions
 
-### 2.1 Conversation repository scope
+### 2.1 Conversation Scope — S1: user-managed, persistent, hard boundary
 
-- Creating a conversation starts with exactly one selected repository whose index is READY.
-- A user may later add or remove repositories from that conversation's scope.
-- The scope is persistent across messages until the user changes it.
-- A repository newly imported into a Project is **not** silently added to existing conversations.
-- When a new repository becomes READY, the Web app shows a notification/suggestion to add it to a relevant conversation. The user must explicitly confirm.
-- Do not infer conversation scope from the most recently imported repository or a mutable project-level active repository.
+- A new conversation starts with exactly one READY repository selected.
+- The user can explicitly add or remove READY repositories from that conversation.
+- This set is the persistent **Conversation Scope**. It is the maximum repository universe that the conversation is allowed to search.
+- A newly imported repository is not automatically added to existing conversations. When it becomes READY, show a non-blocking notification/suggestion; add it only after the user confirms.
+- Dismissing the suggestion leaves all existing scopes unchanged.
+- Never infer scope from the latest imported repository or a project-level active repository.
+- A repository outside Conversation Scope must never be searched for that conversation, even if a client submits its ID.
 
-### 2.2 Per-question repository focus
+### 2.2 Per-question Repository Focus — F2: arbitrary multi-select, soft preference
 
-Add a multi-select repository control next to the question composer.
+The composer provides a multi-select control listing repositories already in the current Conversation Scope.
 
-- Available choices are only repositories already included in the current conversation scope and READY for querying.
-- No explicit selection means query the entire conversation scope.
-- Selecting one repository focuses the current question on that repository.
-- Selecting multiple repositories focuses the current question on the selected set, including questions that compare or trace behavior across repositories.
-- Focus applies only to the current message. It must not mutate the persistent conversation scope.
-- After sending, the UI should retain enough state to show which repositories were used for that message; the next question may choose a different focus.
+**Focus is a preference/hint, not a hard retrieval filter.** It tells the system and LLM which repositories the user expects to be most relevant. It must not prevent the system from searching other repositories that are already inside Conversation Scope when the focused repositories do not provide enough evidence.
 
-The selected repository names/identities are semantic metadata for the current question. They must guide both retrieval scope and the LLM prompt. **Prompt wording alone is not multi-repository retrieval.**
+Expected semantics:
 
-## 3. Ownership and implementation requirements
+1. No repositories selected: search the full Conversation Scope without a preferred subset.
+2. One or more repositories selected: prioritize retrieval from those repositories and clearly tell the answer-generation step that they are the user's intended focus.
+3. If focused repositories provide sufficient evidence, answer primarily from that evidence.
+4. If evidence is missing, weak, or only partially answers the question, RAG may expand retrieval to the remaining repositories in Conversation Scope.
+5. If useful evidence is found outside the selected focus, the answer must identify the repository where it was found and state that the focused repositories did not provide sufficient evidence. Where appropriate, ask whether the user intended to select a different focus.
+6. If no repository in the entire Conversation Scope provides sufficient evidence, do not fabricate an answer. State that the available repositories do not contain enough evidence and ask the user to check the repository selection or clarify whether the question is outside the indexed codebase.
+7. Focus applies only to the current message. It must not add/remove repositories from Conversation Scope. The next message may use a different focus.
+
+**Important distinction:** Conversation Scope is the hard authorization/search boundary; Repository Focus is a soft ranking/priority signal within that boundary. Prompt wording alone is insufficient: focus must influence retrieval prioritization, evidence allocation, or staged expansion in RAG.
+
+### 2.3 Multi-index architecture — B: RAG owns orchestration
+
+The owner selected **RAG Multi-Index Orchestrator**. RAG is responsible for retrieving from multiple authorized indexes, merging evidence, preserving provenance, and performing one final generation.
+
+- Web Backend remains the source of truth for user authorization, Project/Repository records, Conversation Scope, and the per-message focus selection.
+- Web Backend resolves repository records to READY `index_id` values server-side and passes the authorized index set plus focus metadata to the RAG multi-index capability.
+- RAG retrieves from focused indexes with priority, then expands to other supplied indexes in the same scope when evidence is insufficient.
+- RAG performs evidence-level fusion/deduplication and one coherent final generation. Do not fan out to the existing single-index endpoint and concatenate independently generated answers.
+- Every evidence item and citation must retain repository/index provenance.
+- Current `POST /v1/query` accepts one `index_id`. A multi-index request/response contract is therefore a separate design deliverable. **Do not edit `contracts/openapi.yaml` until the proposal has been reviewed and explicitly approved by the project owner.**
+
+### 2.4 History and citations — H2: immutable per-message snapshot
+
+Persist enough information to explain each historical answer independently of the current scope:
+
+- Conversation Scope at send time.
+- User-selected focus at send time (including an empty selection).
+- Actual indexes/repositories searched, including any fallback expansion.
+- Repository/index identity and indexed commit/ref.
+- Citation provenance: repository ID, index ID, path, line range, snippet, and other stable source metadata required by the viewer.
+- Per-repository query outcome: searched with evidence, searched with no evidence, unavailable/failed, or not searched.
+
+Removing a repository from scope or deleting it later must not rewrite old messages or erase their citation snapshots. A historical citation should retain its snapshot/snippet; live file navigation may show that the source is no longer available.
+
+### 2.5 Error and no-evidence behavior — E2: partial result with explicit status
+
+- If one repository is unavailable but other in-scope repositories can be searched, return a partial result when useful evidence exists and clearly disclose which source was unavailable.
+- A successfully searched repository with no relevant evidence is **not** an error. Distinguish “searched, no evidence” from “not searched / unavailable / failed”.
+- Never silently omit an index that the system was expected to query.
+- If all eligible repositories fail/unavailable, return a clear error state rather than a fabricated answer.
+- If all repositories are searched successfully but no sufficient evidence is found, return a no-evidence response and invite the user to verify the selected focus/scope or clarify whether the question is outside the indexed codebase.
+
+## 3. Required implementation changes and ownership
 
 ### Web Frontend
 
-1. On conversation creation, choose one READY repository by default.
-2. Provide conversation-scope management to add/remove READY repositories.
-3. Add a multi-select repository-focus control beside the question input.
-4. Make the distinction visible in the UI:
-   - conversation scope = repositories available to this conversation;
-   - question focus = repositories selected for this message only.
-5. If no focus is selected, communicate that all repositories in the conversation scope will be searched.
-6. When a new repository becomes READY, show a non-blocking notification/suggestion. Add it only after explicit user confirmation.
-7. Display repository/index provenance for each assistant message and its citations.
+1. Conversation creation selects one READY repository by default.
+2. Add Conversation Scope management (add/remove repositories) outside the composer.
+3. Add arbitrary multi-select Repository Focus beside the composer.
+4. Make the distinction explicit in labels/help text:
+   - “Conversation Scope”: repositories available to this conversation.
+   - “Focus for this question”: repositories to prioritize for this message; other repositories in scope may still be searched if needed.
+5. Empty focus must be visibly described as “Search all repositories in this conversation”.
+6. Keep focus selection per message; do not persist it as a change to Conversation Scope. Show the actual repositories searched on the resulting message, not only the user's initial focus.
+7. Show non-blocking “repository ready — add to conversation?” notification. Confirm adds; dismiss leaves scope unchanged.
+8. Show partial/unavailable source status and distinguish it from a successful search with no evidence.
+9. Display repository identity with each citation so identical paths in different repositories remain distinguishable.
 
 ### Web Backend
 
-1. Persist a many-to-many Conversation–Repository relationship (or an equivalent normalized model).
-2. On message creation, accept optional repository focus identifiers, not client-supplied RAG `index_id` values.
-3. Authorize the user and verify every focused repository belongs to the conversation scope and the user's Project.
-4. Resolve repository → current READY index on the server. Reject invalid/out-of-scope selections; never trust a client-provided index identifier.
-5. If focus is empty, derive the effective focus from the full conversation scope.
-6. Persist immutable per-message snapshots:
-   - conversation scope used;
-   - effective repository focus used;
-   - repository IDs and index IDs actually queried;
-   - citation provenance (repository ID, index ID/commit, path, line range, snippet).
-7. Do not silently omit an index that is failed, indexing, deleted, or unavailable. Return a clear partial/unavailable-source indication or fail the query according to an explicitly documented policy.
-8. Preserve historical messages and citation snapshots if a repository is later removed from the conversation or deleted.
+1. Persist normalized Conversation–Repository N:N membership (or an equivalent model).
+2. Accept optional repository IDs for the current message's focus; never accept client-supplied RAG `index_id` as authoritative.
+3. Authorize the user and verify all scope/focus repositories belong to the correct Project and user.
+4. Validate selected focus as a subset of Conversation Scope. Reject out-of-scope IDs and forged repository/index identifiers before contacting RAG.
+5. Resolve repository → current READY index on the server. Pass the full authorized Conversation Scope index set plus the selected focus subset to RAG, so RAG can perform soft-focus fallback without escaping scope.
+6. Persist immutable message snapshots described in §2.4, including actual searched indexes and per-repository outcomes returned by RAG.
+7. Preserve old message/citation snapshots after repository removal/deletion.
+8. Map RAG partial/unavailable/no-evidence states to explicit Web API/UI states. Do not silently drop source failures.
+9. Do not automatically retry a query POST after it may have reached RAG.
 
-### Multi-index retrieval and answer assembly — architecture decision required
+### RAG Service
 
-The current RAG `POST /v1/query` contract accepts **one `index_id` per request** and returns a generated answer plus citations. Therefore Web/RAG must agree on a correct orchestration strategy before implementation.
+1. Design and implement a Multi-Index Orchestrator that accepts a bounded list of authorized index IDs and an optional focus subset supplied by Web Backend.
+2. Validate all supplied indexes exist and are READY; report per-index failures/statuses instead of silently ignoring them.
+3. Implement soft-focus retrieval:
+   - focused indexes receive first priority / preferred evidence budget;
+   - evaluate whether retrieved evidence is sufficient for the question;
+   - expand to the remaining in-scope indexes when focused evidence is insufficient or incomplete;
+   - never search an index not supplied in the authorized Conversation Scope set.
+4. Define a measurable, testable evidence-sufficiency policy. Start with deterministic test fixtures and retrieval diagnostics; document thresholds/heuristics and avoid claiming semantic certainty from a score alone.
+5. Fuse evidence across indexes, deduplicate safely, balance context so one repository cannot crowd out all others, and retain repository/index/commit/path/line provenance.
+6. Run one final generation over the fused evidence. Prompt must explain user focus, which repositories were actually searched, which evidence came from fallback repositories, and which sources failed or had no evidence.
+7. Return answer, citations, per-index query outcomes, actual searched indexes, focus metadata, and enough diagnostics for reproducible tests.
+8. If evidence is found only outside focus, say so explicitly. If no evidence exists in the entire scope, return a grounded no-evidence response that asks the user to verify selection or clarify out-of-scope intent.
 
-Required behavior:
-- Search every repository in the effective focus (not just the most recently imported one).
-- Merge/deduplicate candidate evidence across repositories.
-- Preserve repository/index provenance on every evidence item and citation.
-- Assemble a balanced context so one large/noisy repository cannot silently crowd out all other selected repositories.
-- For cross-repository questions, generate one coherent answer from evidence across the selected repositories.
-- If evidence exists in only one of several selected repositories, state that limitation instead of implying all repositories were checked successfully.
+## 4. API and contract gate
 
-Possible approaches to review (not yet selected):
-1. Web fan-out to the existing single-index endpoint followed by a new evidence/context assembly stage. The current endpoint returns generated answers, so simply concatenating per-index answers is not an adequate substitute for evidence-level fusion.
-2. A dedicated multi-index orchestration capability in RAG that owns retrieval fusion and one final generation step.
+The current single-index `POST /v1/query` is insufficient for this architecture. Before implementation of the Web↔RAG request shape, Web and RAG must prepare a short contract proposal covering:
 
-The teams must compare complexity, latency, citation correctness, error handling, and ownership, then document the selected approach. Do not change `contracts/openapi.yaml` until the contract proposal has been reviewed and explicitly approved by the project owner.
+- Request fields: question, authorized scope index list, optional focused index list, retrieval options, request/correlation ID.
+- Response fields: one answer, citations with repository/index provenance, actual searched indexes, per-index outcomes, focus/fallback disclosure, latency/usage and error/partial status.
+- Validation: focus must be a subset of scope; index IDs resolved and authorized by Web Backend; RAG validates READY status.
+- Failure semantics: partial success, all-source failure, no evidence, invalid/not-ready index.
+- Size limits, ordering/budget policy, timeout and retry behavior.
 
-## 4. Required acceptance tests
+Review the proposal with the project owner first. Only after explicit approval may `contracts/openapi.yaml` and the Web/RAG implementations be changed. No OpenAPI change is authorized by this document alone.
 
-### A. Conversation scope
+## 5. Acceptance test fixture and execution method
 
-| ID | Scenario | Expected result |
+### 5.1 Prepare deterministic repositories
+
+Use two small public test repositories or controlled fixtures with known, intentionally distinct evidence:
+
+- **Repo A (Backend):** a uniquely named endpoint such as `/api/orders/{order_id}`, its handler, and a distinctive response field such as `total_after_discount`.
+- **Repo B (Frontend):** a uniquely named API client call to that endpoint and the component/function that reads `total_after_discount`.
+- Add a control symbol with the same name in both repositories but different behavior, to test provenance and disambiguation.
+- Optionally add **Repo C** after the conversation has been created, to test the notification and explicit-add flow.
+- Record exact Git commit SHAs and the expected file/line ranges before running tests.
+
+Do not rely on general questions whose answers are guessed from common programming knowledge. Each test question must have a known expected source in the fixture.
+
+### 5.2 Execution layers
+
+- **Unit tests:** scope/focus validation, soft-focus policy, evidence sufficiency/fallback decisions, provenance-preserving deduplication, per-index outcome classification, snapshot serialization.
+- **RAG integration tests:** create READY indexes for A/B, send multi-index requests, inspect actual queried indexes, fused evidence, answer and citations.
+- **Web API integration tests:** verify authorization, scope membership, server-side index resolution, snapshots and error mapping.
+- **Browser-driven E2E:** execute user-visible create/manage conversation, focus selection, send messages, view actual searched repositories/citations, import notification, history and deletion flows.
+- Capture request/response traces with secrets redacted, application logs/correlation IDs, screenshots for UI cases, test output and exact commit SHAs.
+
+### 5.3 Test cases — Conversation Scope
+
+| ID | Setup and steps | Expected result / evidence |
 |---|---|---|
-| S01 | Create a conversation with Repository A READY | Scope contains A only |
-| S02 | Add Repository B to the conversation | Scope contains A and B |
-| S03 | Remove B from scope | Future messages no longer search B; prior message snapshots remain unchanged |
-| S04 | Import Repository C and wait until READY | Existing conversation scope remains A/B; UI offers an explicit add-C action |
-| S05 | Dismiss the notification | C is not added |
-| S06 | Confirm add-C | C is added to that conversation only |
-| S07 | Repository is indexing/failed/deleted | It cannot be queried as READY; UI/backend explain its state |
+| S01 | Create conversation while A is READY. | Scope contains A only; persisted Conversation–Repository membership is verified. |
+| S02 | Add READY B from the scope manager. | Scope becomes A+B; both are queryable. |
+| S03 | Remove B, then send a question whose only evidence is in B. | B is not searched for the new message; prior message snapshots/citations remain unchanged. |
+| S04 | Import C after conversation creation and wait until C is READY. | Existing scope remains A+B; notification/suggestion appears. |
+| S05 | Dismiss C notification and refresh/reopen conversation. | C remains outside scope; no implicit membership is created. |
+| S06 | Confirm “Add C” for this conversation. | C is added only to this conversation; other conversations are unchanged. |
+| S07 | Try adding an indexing, failed, deleted or unavailable repository. | UI/backend explains state; it is not treated as READY or silently substituted. |
+| S08 | Import a new repository while multiple conversations exist. | Each conversation's scope remains unchanged until the user explicitly adds the repository to that conversation. |
 
-### B. Per-question focus
+### 5.4 Test cases — Per-question Focus (soft preference)
 
-| ID | Scenario | Expected result |
+| ID | Setup and steps | Expected result / evidence |
 |---|---|---|
-| F01 | Scope A/B, no focus selected | Query uses A and B |
-| F02 | Scope A/B, focus A | Query uses A only |
-| F03 | Scope A/B, focus B | Query uses B only |
-| F04 | Scope A/B, focus A+B | Query uses both and can synthesize cross-repository evidence |
-| F05 | Ask next message with focus A after prior A+B | Only current message uses A; conversation scope remains A/B |
-| F06 | Send a repository outside scope as focus | Backend rejects it; no query is sent to that index |
-| F07 | Supply a forged index ID from the client | Backend ignores/rejects it and resolves index IDs server-side |
-| F08 | Reopen conversation history | Each message shows its own effective focus/scope snapshot |
+| F01 | Scope A+B; leave focus empty; ask a question whose evidence is split across A and B. | Both indexes are searched; one coherent answer cites both. |
+| F02 | Scope A+B; focus A; ask a question with sufficient evidence only in A. | A is prioritized and answer is grounded in A; B need not be searched if sufficiency policy says A is enough. Actual searched-index trace is stored. |
+| F03 | Scope A+B; focus B; repeat with evidence only in B. | B is prioritized; answer/citations identify B. |
+| F04 | Scope A+B; focus A+B; ask a cross-repository trace question. | Both focused indexes are searched; one final answer synthesizes evidence from both. |
+| F05 | Scope A+B; focus A, but put the answer only in B. | A is attempted first; insufficient evidence triggers fallback to B. Answer states that A did not provide sufficient evidence and the relevant evidence was found in B. |
+| F06 | Scope A+B; focus A; put related partial evidence in A and decisive evidence in B. | System expands to B when A is insufficient; final answer distinguishes which claim is supported by which repository. |
+| F07 | Scope A+B; focus A; put no answer evidence in either repo. | Both are searched according to the fallback policy; no fabricated answer; response asks user to verify selection or clarify out-of-scope intent. |
+| F08 | Scope A+B; focus A for message 1, then B for message 2. | Message 1 and 2 retain different focus snapshots; scope remains A+B. |
+| F09 | Scope A+B; focus A; put evidence in both A and B. | A receives priority, but B may be used when needed; response and provenance do not misrepresent B as part of the initial focus. |
+| F10 | Scope A+B; focus A; ask about a concept found only in out-of-scope Repo C. | C is never searched. Response says no sufficient evidence exists in this conversation's scope and suggests adding the intended repository. |
+| F11 | Submit a repository outside scope as focus via a tampered request. | Web Backend rejects the request before RAG is called. |
+| F12 | Submit forged `index_id` values or alter repository-to-index mapping client-side. | Web Backend ignores/rejects client-supplied index IDs and resolves current READY indexes from trusted server-side records. |
+| F13 | Reopen conversation history after several different focus selections. | Each message shows the user's focus and the repositories actually searched; these are not conflated. |
 
-### C. Retrieval, answer and citations
+### 5.5 Test cases — Multi-index retrieval, answer and citations
 
-| ID | Scenario | Expected result |
+| ID | Setup and steps | Expected result / evidence |
 |---|---|---|
-| R01 | Cross-repo question where evidence exists in A and B | Final answer uses evidence from both, with citations attributed to the correct repository |
-| R02 | Similar file paths/symbol names exist in A and B | Citations remain unambiguous and open the correct repository's file |
-| R03 | Only A has evidence; B has none | Answer states the evidence limitation; it does not imply B confirmed the claim |
-| R04 | B fails or becomes unavailable while A is queryable | UI/answer clearly reports partial/unavailable source status; no silent omission |
-| R05 | Remove B from scope after an answer cited B | Old answer and citation snapshot remain readable |
-| R06 | Delete B after an answer cited B | Historical snippet/provenance remains; live file access reports source unavailable |
-| R07 | Duplicate/overlapping chunks appear across indexes | Deduplication does not erase repository provenance or collapse distinct repository evidence incorrectly |
+| R01 | Ask which frontend function calls the backend endpoint and how its response is consumed. | One final answer uses evidence from A and B; each claim cites the correct repository. |
+| R02 | Put same file path or symbol name in A and B with different content. | Citation identity includes repository and index; opening each citation reaches the correct repository/file/lines. |
+| R03 | Evidence exists only in A; B is successfully searched but has no evidence. | Outcome for B is “searched/no evidence”, not “failed”; answer does not imply B confirms the claim. |
+| R04 | Make B unavailable while A is searchable and has useful evidence. | Partial answer is returned when useful; B is explicitly marked unavailable; no silent omission. |
+| R05 | Make focused A unavailable while non-focused B is READY and has evidence. | A's failure is disclosed; fallback to B is explicit; answer cites B correctly. |
+| R06 | Remove B from scope after a prior answer cited B. | Old answer, snapshot and citations remain readable; new queries do not search B. |
+| R07 | Delete B after a prior answer cited B. | Historical snippet/provenance remains; live file navigation clearly reports source unavailable. |
+| R08 | Return overlapping/duplicate chunks from A and B. | Deduplication is safe; distinct repository provenance is not lost. |
+| R09 | Force all supplied indexes to fail/unavailable. | Explicit all-source failure state; no fabricated answer and no false “no evidence” classification. |
+| R10 | All indexes complete successfully but none has relevant evidence. | Grounded no-evidence response; distinguish this from infrastructure failure. |
+| R11 | Ask a question whose answer requires combining two facts from different repos. | Final generation combines both facts and cites each; no independent per-repo answer concatenation. |
 
-### D. Security, isolation and resilience
+### 5.6 Test cases — Security, concurrency, timeout and recovery
 
-- A user cannot add a repository from another user's Project.
-- A focus set must be a subset of the conversation scope.
-- Two concurrent users querying different scopes must not receive mixed evidence/citations.
-- Two concurrent index jobs must not change an existing conversation's scope.
-- Query POST is not automatically retried after it may have reached RAG.
-- Verify the nested timeout budget from D39: RAG OpenRouter 60 seconds total across fallback attempts; Web → RAG 65 seconds; Frontend → Web 75 seconds. Verify actual HTTP client and proxy settings, not only environment defaults.
+| ID | Setup and steps | Expected result / evidence |
+|---|---|---|
+| Q01 | User 1 tries to add/focus a repository owned by User 2. | Authorization failure; no metadata leak and no RAG call. |
+| Q02 | Two users concurrently query different conversation scopes. | No cross-user evidence, citations, focus or snapshot leakage. |
+| Q03 | Run two repository indexing jobs while a conversation is active. | Scope does not change unless user confirms adding the new READY repository. |
+| Q04 | Trigger RAG LLM timeout/error after query POST has been sent. | Web maps the error clearly; no automatic duplicate query POST. |
+| Q05 | Inspect RAG, Web HTTP client, reverse proxy and frontend timeout values. | Actual chain respects D39: RAG OpenRouter 60s total fallback deadline; Web→RAG 65s; Frontend→Web 75s. |
+| Q06 | Restart RAG while indexes are READY and while an index is being built. | READY index recovery and in-progress job failure/recovery behavior are explicit; conversation scope is not silently rewritten. |
+| Q07 | Test maximum supported number of indexes and a repository near/over configured size limits. | Limits, latency, resource use and error mapping are recorded; no unbounded fan-out. |
 
-## 5. Test dataset recommendation
+### 5.7 Evidence required for every test run
 
-Use at least two repositories with intentionally related code, for example:
-- Backend repository: defines API endpoints/contracts.
-- Frontend repository: calls those endpoints and maps response fields.
+For each test case, record:
 
-Prepare questions in three groups:
-1. Single-repository controls: questions whose answer exists only in A or only in B.
-2. Cross-repository trace: “Which frontend function calls this backend endpoint, and how are the response fields consumed?”
-3. Conflict/absence controls: same symbol name in both repos, or a claim present in only one repo.
+- Test ID, date/time, environment and pass/fail/blocked status.
+- Exact Web commit SHA, RAG commit SHA, fixture repository URLs and commit SHAs.
+- Conversation ID, scope membership at send time, user focus selection.
+- Index IDs actually queried and per-index outcome (evidence / no evidence / unavailable / failed / not searched).
+- Retrieval trace sufficient to prove focused-first and fallback behavior.
+- Final answer, citation repository/index/path/line, and whether each citation supports the claim.
+- Latency per stage and total latency; concurrency conditions where relevant.
+- Screenshot for browser/UI tests; redacted request/response and logs for API/integration tests.
+- Known limitations, skipped cases and reason.
 
-For each question, record expected repository evidence, returned repository/index IDs, citations, answer correctness, latency, and any unavailable-source state. Do not treat a citation opening successfully as proof that the cited source is semantically relevant.
+A citation opening at the correct path/line proves navigation integrity only; it does not by itself prove semantic relevance or answer correctness.
 
 ## 6. Definition of done
 
-- [ ] Conversation starts with one READY repository.
-- [ ] User can expand and shrink scope.
-- [ ] New repository notification requires explicit user action.
-- [ ] Composer focus supports none / one / multiple repositories.
-- [ ] Focus is per-message and does not mutate persistent scope.
-- [ ] Server-side authorization and index resolution are enforced.
-- [ ] Cross-repository retrieval produces one evidence-grounded answer with correct citations.
-- [ ] Per-message scope/focus snapshots are persisted and shown in history.
-- [ ] Unavailable repositories are not silently skipped.
-- [ ] Browser-driven E2E passes for the scenarios above.
-- [ ] Contract changes, if any, are separately reviewed and approved.
+- [ ] Conversation starts with one READY repository; user can manually add/remove scope members.
+- [ ] New repository notification is non-blocking and requires explicit confirmation.
+- [ ] Focus supports none / one / arbitrary multiple repositories and is per-message.
+- [ ] Scope is the hard boundary; focus is a soft retrieval priority within that boundary.
+- [ ] Focused-first retrieval and fallback to remaining in-scope repositories are demonstrated by traces/tests.
+- [ ] No evidence in the whole scope produces a grounded clarification/no-evidence response.
+- [ ] RAG Multi-Index Orchestrator performs evidence-level fusion and one final generation.
+- [ ] Citations preserve repository/index/commit/path/line provenance.
+- [ ] H2 message snapshots persist scope, selected focus, actual searched indexes and per-index outcomes.
+- [ ] Partial source failures are explicit; no silent omission.
+- [ ] Authorization and server-side index resolution are tested.
+- [ ] Browser-driven E2E and API/integration tests pass for the required cases.
+- [ ] Any OpenAPI proposal is reviewed and separately approved before editing the contract.
+- [ ] A dated D40 E2E report is published with exact commits, fixture SHAs, evidence and limitations.
 
-## 7. Relationship to the 2026-11-21 baseline report
+## 7. Relationship to the 2026-11-21 baseline
 
-Keep the existing report unchanged as historical evidence for the old implementation. Its 18-query latency and 82/82 citation-opening results remain baseline observations only. They do not validate D40.
-
-After implementation, publish a separate dated E2E report with:
-- exact Web and RAG commit SHAs;
-- exact repository refs/index IDs used;
-- actual conversation scope and per-question focus;
-- test cases and pass/fail evidence;
-- citations and source provenance;
-- latency per query and concurrency conditions;
-- all skipped tests and known limitations.
+Keep the 2026-11-21 report unchanged. Its 18-query latency and 82/82 citation-opening results remain historical baseline observations only; they do not validate D40.
 
 **No D40 implementation or E2E pass is claimed by this document.**
