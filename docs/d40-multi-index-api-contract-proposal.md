@@ -332,6 +332,57 @@ Do not put the entire scope/focus snapshot only on the user message: the assista
 
 Repository deletion should preserve snapshot JSON and citation snippets. Live file retrieval can fail with a source-unavailable state.
 
+
+
+## 9.1 Proposed Web API and DTO changes
+
+The following are Web-facing API suggestions for review; they are separate from the RAG endpoint above.
+
+| Web route | Proposed change | Validation / behavior |
+|---|---|---|
+| `POST /api/projects/{projectId}/conversations` | Require `initial_repository_id` in the create request (title remains optional). | Repository must belong to the caller's Project and be READY. Create Conversation and its first scope-membership row atomically. |
+| `GET /api/conversations/{id}/repositories` | Return the current Conversation Scope. | Only owner can read; return repository metadata/status but never RAG API key or internal index ID to browser. |
+| `POST /api/conversations/{id}/repositories` | Add `repository_id` to this conversation's scope. | Explicit user action; same Project/user; repository must be READY; duplicate add is idempotent or returns a documented conflict. |
+| `DELETE /api/conversations/{id}/repositories/{repositoryId}` | Remove membership from current scope. | Does not delete the repository from the Project and does not rewrite historical message snapshots. |
+| `POST /api/conversations/{id}/messages` | Extend `AskRequest` with optional `focus_repository_ids: string[]`. | Empty/omitted = all scope; non-empty = soft preference. Validate focus subset of current scope before calling RAG. |
+| `GET /api/conversations/{id}/messages` | Extend message DTO with execution status, answer status and retrieval snapshot. | Historical values are returned from the immutable stored snapshot, not recomputed from current scope. |
+
+The route shapes are proposals. Web team should align naming, response conventions and status codes with the existing controller/API style before approval.
+
+### Proposed Web request/response examples
+
+Create a conversation with one READY repository:
+
+```json
+{
+  "title": "Order flow investigation",
+  "initial_repository_id": "8e9a91c2-3b0e-4e5a-9d8f-2f34e9f75b10"
+}
+```
+
+Ask with a per-message soft focus:
+
+```json
+{
+  "question": "Trace the order response from API to UI.",
+  "top_k": 8,
+  "focus_repository_ids": [
+    "8e9a91c2-3b0e-4e5a-9d8f-2f34e9f75b10"
+  ]
+}
+```
+
+The browser sends Web Repository IDs only. Web Backend validates them and resolves trusted RAG index IDs from the database.
+
+### Suggested DTO additions
+
+- `CitationDto`: add `IndexId` while retaining `RepositoryId` and `CommitSha`.
+- `MessageDto`: add `ExecutionStatus`, `AnswerStatus`, and a versioned `RetrievalSnapshot` (or a typed equivalent).
+- `AskRequest`: add `FocusRepositoryIds`; this value applies to one message only.
+- Conversation scope DTO: include repository ID, display name/URL, current readiness and indexed commit; omit `index_id`.
+
+Do not return a live repository's current commit as if it were the historical citation commit. Historical citations must keep the commit and index that produced them.
+
 ## 10. Timeout, resource budget and observability
 
 Multi-index retrieval adds work before final generation. The current historical timeout chain (RAG generation/fallback budget 60s, Web→RAG 65s, frontend→Web 75s) must be measured again with the multi-index orchestrator; do not assume the 5-second Web margin is sufficient for multi-index retrieval plus generation.
@@ -351,7 +402,7 @@ Web Backend and RAG owners should respond to these before implementation:
 
 1. Endpoint name: `POST /v1/query/multi` or a versioned `POST /v2/query`?
 2. Maximum Conversation Scope size for MVP, justified by load tests?
-3. Global `top_k) semantics and per-index candidate budget?
+3. Global `top_k` semantics and per-index candidate budget?
 4. Exact deterministic evidence-sufficiency/fallback policy and its fixture-based calibration?
 5. Parallelism and deadline budget per request?
 6. Exact enum/reason codes for per-index outcomes and top-level partial/unavailable errors?
