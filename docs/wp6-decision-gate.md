@@ -256,3 +256,10 @@ The detailed Web/RAG ownership, contract approval gate, test fixture, test execu
 **OpenAPI remains unchanged and unapproved for modification.** The existing single-index `POST /v1/query` is insufficient for Architecture B; prepare a separate multi-index contract proposal and obtain explicit project-owner approval before changing `contracts/openapi.yaml`.
 
 The 2026-11-21 E2E report remains historical baseline only. No D40 code implementation or E2E pass is claimed.
+
+
+## D40 Multi-Index API contract review draft (2026-11-23)
+
+A separate proposal has been created at [docs/d40-multi-index-api-contract-proposal.md](d40-multi-index-api-contract-proposal.md), based on current source review of both repositories. It proposes a backward-compatible multi-index endpoint, request/response semantics, soft-focus fallback, per-index outcomes, citation provenance, H2 persistence, limits/timeouts and open review questions.
+
+This is a review draft only. Existing `POST /v1/query` and `contracts/openapi.yaml` remain unchanged until Web/RAG review and explicit owner approval.
