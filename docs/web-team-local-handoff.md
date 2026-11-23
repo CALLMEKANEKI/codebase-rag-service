@@ -144,3 +144,19 @@ Verify actual timeout settings in the Web HTTP client, reverse proxy/nginx, and 
 - [ ] Frontend and backend agree on request/response fields from `contracts/openapi.yaml`.
 
 Deployment remains deferred until the project owner chooses a hosting target, budget, public-access policy, and secret-management approach.
+
+
+## 9. D40 multi-repository conversation behavior
+
+The product decision has moved beyond the earlier single-repository-per-conversation proposal. See the [D40 implementation handoff and E2E test plan](web-team-d40-implementation-and-test-plan.md) for the authoritative requirements.
+
+Summary:
+- A conversation starts with one READY repository; users can add/remove repositories from its persistent scope.
+- A new repository becoming READY does not automatically alter existing conversations. The Web UI must suggest adding it and wait for explicit confirmation.
+- The question composer must offer a multi-select repository focus. Empty focus means all repositories in the conversation scope; one or more selected repositories apply to that message only.
+- Web Backend must validate focus as a subset of conversation scope and resolve RAG index IDs server-side.
+- Focus must influence both retrieval and prompt semantics. Adding repository names to the prompt without retrieving evidence from those repositories does not satisfy multi-repository support.
+- Current `POST /v1/query` accepts one `index_id`. Web/RAG must review the multi-index orchestration strategy before implementation. Do not simply concatenate independently generated per-repository answers and treat that as evidence fusion.
+- Preserve repository/index provenance and per-message scope/focus snapshots for citations and history.
+
+The 2026-11-21 E2E report remains the historical baseline for the previous active-repository behavior. It is not an acceptance report for D40. The D40 test plan defines the new acceptance tests. No D40 implementation or E2E pass is claimed yet.
