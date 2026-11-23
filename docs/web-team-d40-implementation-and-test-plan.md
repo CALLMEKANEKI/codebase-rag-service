@@ -118,6 +118,9 @@ Removing a repository from scope or deleting it later must not rewrite old messa
 
 ## 4. API and contract gate
 
+A separate review draft is now available: [D40 Multi-Index API Contract Proposal](d40-multi-index-api-contract-proposal.md). It is based on the current Web/RAG source review and is not approved for implementation. Web and RAG should answer its open review questions before any OpenAPI edit.
+
+
 The current single-index `POST /v1/query` is insufficient for this architecture. Before implementation of the Web↔RAG request shape, Web and RAG must prepare a short contract proposal covering:
 
 - Request fields: question, authorized scope index list, optional focused index list, retrieval options, request/correlation ID.
