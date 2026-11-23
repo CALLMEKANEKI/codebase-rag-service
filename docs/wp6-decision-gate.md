@@ -239,3 +239,20 @@ Product behavior was decided on 2026-11-23 and is documented in Notion page **03
 Implementation responsibilities and acceptance tests: [docs/web-team-d40-implementation-and-test-plan.md](web-team-d40-implementation-and-test-plan.md). Local startup/API handoff: [docs/web-team-local-handoff.md](web-team-local-handoff.md).
 
 The 2026-11-21 Web E2E report remains a historical baseline for the previous active-repository behavior. It is not a D40 acceptance report. No D40 implementation or E2E pass is claimed yet.
+
+
+## D40 final product and architecture decisions (2026-11-23)
+
+The owner confirmed the following:
+- Conversation Scope S1 is user-managed and is the hard repository boundary.
+- Repository Focus F2 allows arbitrary multi-select but is a **soft preference**. RAG prioritizes focused indexes and may fall back to other indexes already in Conversation Scope when focused evidence is insufficient. It must never escape the scope.
+- Multi-repository orchestration is **Architecture B**: RAG owns retrieval across indexes, evidence-level fusion, provenance, and one final generation.
+- H2 stores immutable per-message scope/focus/actual-search/outcome/citation snapshots.
+- E2 returns useful partial results while explicitly reporting unavailable/failed sources; “searched but no evidence” is a separate outcome.
+- No-evidence across the full scope must produce a grounded clarification response, not a fabricated answer.
+
+The detailed Web/RAG ownership, contract approval gate, test fixture, test execution procedure, and acceptance matrix are in [D40 implementation handoff and test plan](web-team-d40-implementation-and-test-plan.md). The local setup guide is [web-team-local-handoff.md](web-team-local-handoff.md).
+
+**OpenAPI remains unchanged and unapproved for modification.** The existing single-index `POST /v1/query` is insufficient for Architecture B; prepare a separate multi-index contract proposal and obtain explicit project-owner approval before changing `contracts/openapi.yaml`.
+
+The 2026-11-21 E2E report remains historical baseline only. No D40 code implementation or E2E pass is claimed.
