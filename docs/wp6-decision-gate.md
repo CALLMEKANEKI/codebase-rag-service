@@ -223,3 +223,19 @@ R1–R4 are tracked as quality fixes. No production-quality claim is made from t
 - D39: timeout budget for the measured demo configuration is LLM provider 60s total across all OpenRouter model fallbacks (not 60s per model), Web Backend→RAG query 65s, Frontend→Web Backend message 75s. The RAG adapter now shares one monotonic deadline across sequential model attempts. Verify every HTTP client and reverse proxy timeout, not only environment defaults. Do not automatically retry a query POST after it may have been sent. These are demo settings, not production SLOs.
 
 A separate E2E follow-up checklist is recorded in Notion page 03 — Quy ước & kiến trúc chung. The remaining checks must be completed before a deployment-readiness claim; they do not block the current local demo.
+
+
+## D40 — Multi-repository conversation scope and per-question focus
+
+Product behavior was decided on 2026-11-23 and is documented in Notion page **03 — Quy ước & kiến trúc chung**.
+
+- Conversation starts with one READY repository and can expand to multiple repositories.
+- A newly imported repository is not auto-added to existing conversations; Web must show a notification/suggestion and wait for explicit user action.
+- The question composer has a multi-select repository focus. Empty selection means the whole conversation scope; one or more selections apply only to the current message.
+- Web Backend owns authorization, conversation scope, focus validation, server-side repository → index resolution, and immutable per-message scope/focus snapshots.
+- Cross-repository questions require retrieval evidence from all selected indexes, evidence-level fusion, one coherent answer, and citations retaining repository/index provenance. Prompt metadata alone does not satisfy this requirement.
+- Current `POST /v1/query` accepts one `index_id`. Web/RAG must review the orchestration design (including the limits of fan-out to an endpoint that independently generates an answer) before implementation. No OpenAPI change is included or approved.
+
+Implementation responsibilities and acceptance tests: [docs/web-team-d40-implementation-and-test-plan.md](web-team-d40-implementation-and-test-plan.md). Local startup/API handoff: [docs/web-team-local-handoff.md](web-team-local-handoff.md).
+
+The 2026-11-21 Web E2E report remains a historical baseline for the previous active-repository behavior. It is not a D40 acceptance report. No D40 implementation or E2E pass is claimed yet.
