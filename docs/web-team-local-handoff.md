@@ -158,6 +158,8 @@ The final owner decisions and detailed acceptance matrix are in the [D40 impleme
 - Web Backend owns authorization, Conversation Scope, trusted repository→index resolution, and H2 per-message snapshots (scope, selected focus, actual searched indexes, outcomes and citations). Never trust client-supplied index IDs.
 - **H2:** preserve immutable message/citation snapshots after scope removal or repository deletion. Live source navigation may report the source unavailable.
 - **E2:** partial results are allowed when useful evidence exists, but unavailable/failed sources must be explicitly reported and distinguished from “searched, no evidence”.
-- Current `POST /v1/query` accepts one `index_id`. A multi-index contract proposal must be reviewed separately. Do not change `contracts/openapi.yaml` before explicit project-owner approval.
+- Current `POST /v1/query` accepts one `index_id`; the proposed multi-index endpoint is `POST /v1/query/multi`.
+- **Consolidated Web Backend + Frontend review (2026-11-24):** [D40 Multi-Index API Contract Review v2](d40-multi-index-api-contract-review-v2.md). This is the current owner-review draft. It adopts Scope cap 5, browser-safe DTOs without `index_id`, Python-only fixtures, explicit per-source outcomes/reasons, and the total 60/65/75-second timeout chain.
+- Do not change `contracts/openapi.yaml` before explicit project-owner approval of the consolidated contract.
 
 The 2026-11-21 E2E report remains a historical baseline, not a D40 acceptance report. No D40 implementation or E2E pass is claimed yet.
