@@ -118,7 +118,9 @@ Removing a repository from scope or deleting it later must not rewrite old messa
 
 ## 4. API and contract gate
 
-A separate review draft is now available: [D40 Multi-Index API Contract Proposal](d40-multi-index-api-contract-proposal.md). It is based on the current Web/RAG source review and is not approved for implementation. Web and RAG should answer its open review questions before any OpenAPI edit.
+The reviews from Web Backend (2026-11-23) and Frontend (2026-11-24) have been consolidated in [D40 Multi-Index API Contract Review v2](d40-multi-index-api-contract-review-v2.md). It supersedes the unresolved open-question list in the original proposal for the purpose of final owner review; the original proposal remains as review history. The consolidated draft adopts `POST /v1/query/multi`, a default Scope cap of 5, browser-safe DTOs with no `index_id`, Python-only paired fixtures, the fixed outcome/reason enums, and the 60/65/75-second timeout chain.
+
+**Approval gate remains:** this is still a review draft. Do not edit `contracts/openapi.yaml`, implement, merge, deploy, or claim D40 tests passed until the project owner approves the complete contract and resolves the remaining notification-dismissal decision.
 
 
 The current single-index `POST /v1/query` is insufficient for this architecture. Before implementation of the Web↔RAG request shape, Web and RAG must prepare a short contract proposal covering:
