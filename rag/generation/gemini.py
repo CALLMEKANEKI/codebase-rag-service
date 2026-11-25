@@ -21,6 +21,8 @@ class GeminiLanguageModel:
         if not api_key:
             raise ValueError("GEMINI_API_KEY is required")
         self.model = model
+        self._api_key = api_key
+        self.timeout_seconds = timeout_ms / 1000
         self._client = genai.Client(
             api_key=api_key,
             http_options=types.HttpOptions(timeout=timeout_ms),
