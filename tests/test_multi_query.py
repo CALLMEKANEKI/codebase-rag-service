@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from rag.generation.multi_query import AllIndexesUnavailable, run_multi_query
-from rag.generation.service import QueryResult
-
 
 class FakeRetriever:
     def __init__(self, chunks_by_index):
