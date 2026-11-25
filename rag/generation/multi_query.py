@@ -345,12 +345,20 @@ def run_multi_query(
                 "failed",
             }
         ]
-        guidance = (
-            f"User focus repositories: {', '.join(focus_names) if focus_names else 'none; search the full Scope'}. "
-            f"Fallback repositories attempted: {', '.join(fallback_names) if fallback_names else 'none'}. "
-            "Use only the supplied excerpts. If evidence comes from a fallback repository, "
-            "make that explicit in the answer."
-        )
+        if no_evidence_answer(question).startswith("Tôi"):
+            guidance = (
+                f"Repository được chọn làm Focus: {', '.join(focus_names) if focus_names else 'không có; tìm trong toàn bộ Scope'}. "
+                f"Các repository fallback đã được thử: {', '.join(fallback_names) if fallback_names else 'không có'}. "
+                "Chỉ sử dụng các đoạn mã được cung cấp. Nếu bằng chứng đến từ repository fallback, "
+                "hãy nói rõ điều đó trong câu trả lời."
+            )
+        else:
+            guidance = (
+                f"User focus repositories: {', '.join(focus_names) if focus_names else 'none; search the full Scope'}. "
+                f"Fallback repositories attempted: {', '.join(fallback_names) if fallback_names else 'none'}. "
+                "Use only the supplied excerpts. If evidence comes from a fallback repository, "
+                "make that explicit in the answer."
+            )
         model = query_service.language_model
         remaining_seconds = max(0.1, deadline - time.monotonic())
         if hasattr(model, "generate_with_timeout"):
