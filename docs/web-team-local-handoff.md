@@ -158,11 +158,11 @@ The final owner decisions and detailed acceptance matrix are in the [D40 impleme
 - Web Backend owns authorization, Conversation Scope, trusted repository→index resolution, and H2 per-message snapshots (scope, selected focus, actual searched indexes, outcomes and citations). Never trust client-supplied index IDs.
 - **H2:** preserve immutable message/citation snapshots after scope removal or repository deletion. Live source navigation may report the source unavailable.
 - **E2:** partial results are allowed when useful evidence exists, but unavailable/failed sources must be explicitly reported and distinguished from “searched, no evidence”.
-- Current `POST /v1/query` accepts one `index_id`; the proposed multi-index endpoint is `POST /v1/query/multi`.
-- **Consolidated Web Backend + Frontend review (2026-11-24):** [D40 Multi-Index API Contract Review v2](d40-multi-index-api-contract-review-v2.md). This is the current owner-review draft. It adopts Scope cap 5, browser-safe DTOs without `index_id`, Python-only fixtures, explicit per-source outcomes/reasons, and the total 60/65/75-second timeout chain.
+- Legacy `POST /v1/query` remains single-index. The approved additive `POST /v1/query/multi` is implemented on this branch.
+- **Consolidated Web Backend + Frontend review (2026-11-24):** [D40 Multi-Index API Contract Review v2](d40-multi-index-api-contract-review-v2.md). The project owner approved this contract on 2026-11-25. It adopts Scope cap 5, browser-safe DTOs without `index_id`, Python-only fixtures, explicit per-source outcomes/reasons, and the total 60/65/75-second timeout chain.
 
 - **Owner UX decisions (2026-11-25):** dismissing a repository-ready suggestion persists in browser storage per user + conversation + repository; dismissal never changes Scope. The Chat Header / Scope bar must always show a persistent **+ Add repository** button, even when suggestions are dismissed or Scope is full. It opens the Scope manager; at the 5-repository cap the manager explains the limit and blocks adding a sixth, but the + button remains visible/clickable. See §12 of the consolidated v2 contract.
-- Do not change `contracts/openapi.yaml` before explicit project-owner approval of the consolidated contract.
+- The project owner approved Contract v2 on 2026-11-25; `contracts/openapi.yaml` is aligned to the approved contract on this branch.
 
 The 2026-11-21 E2E report remains a historical baseline, not a D40 acceptance report. The RAG multi-index endpoint has an initial implementation on this branch; unit tests are added but have not been run. Web implementation and D40 acceptance remain pending.
 
