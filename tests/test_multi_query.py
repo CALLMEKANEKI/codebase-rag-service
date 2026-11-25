@@ -97,6 +97,7 @@ def test_multi_query_falls_back_inside_scope_and_keeps_citation_provenance(tmp_p
         },
         rows,
     )
+    model.text = "Fallback evidence found [2]."
     result = run_multi_query(
         question="Explain this code",
         scope=[
@@ -115,6 +116,7 @@ def test_multi_query_falls_back_inside_scope_and_keeps_citation_provenance(tmp_p
     assert result["focus"]["fallback_reason"] == "focused_evidence_insufficient"
     assert result["focus"]["fallback_repository_ids"] == ["repo-b"]
     assert all("repository_id" in citation and "index_id" in citation for citation in result["citations"])
+    assert "fallback source" in result["answer"]
     assert model.calls == 1
 
 
