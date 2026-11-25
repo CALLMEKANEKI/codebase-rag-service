@@ -346,7 +346,7 @@ def run_multi_query(
         ]
         guidance = (
             f"User focus repositories: {', '.join(focus_names) if focus_names else 'none; search the full Scope'}. "
-            f"Fallback repositories searched: {', '.join(fallback_names) if fallback_names else 'none'}. "
+            f"Fallback repositories attempted: {', '.join(fallback_names) if fallback_names else 'none'}. "
             "Use only the supplied excerpts. If evidence comes from a fallback repository, "
             "make that explicit in the answer."
         )
@@ -391,6 +391,19 @@ def run_multi_query(
                     )
                 answer = disclosure + answer
         answer_status = "answered" if citations else "no_evidence"
+        if not citations:
+            if answer.startswith("Tôi") or no_evidence_answer(question).startswith("Tôi"):
+                answer = (
+                    "Các repository trong Conversation Scope chưa cung cấp đủ bằng chứng. "
+                    "Hãy kiểm tra lại Scope/Focus hoặc làm rõ nếu câu hỏi liên quan đến mã nguồn "
+                    "nằm ngoài các repository đã lập chỉ mục."
+                )
+            else:
+                answer = (
+                    "The indexed repositories in this conversation Scope did not provide enough "
+                    "evidence. Check the Scope/Focus selection or clarify if the question is about "
+                    "code outside the indexed repositories."
+                )
         if generated.input_tokens is not None or generated.output_tokens is not None:
             usage = {
                 "input_tokens": generated.input_tokens,
