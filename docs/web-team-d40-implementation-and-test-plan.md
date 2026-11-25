@@ -84,7 +84,7 @@ The first RAG implementation pass is now present on `work/wp6-retrieval-rerankin
 - Evidence is fused across repositories, context is interleaved to reduce single-repository crowding, and one final generation is performed.
 - Citations carry repository ID, RAG index ID and commit SHA alongside existing file/line provenance.
 - Per-repository outcomes distinguish evidence, no evidence, unavailable, failed and not searched; all-source unavailability maps to 503.
-- The RAG endpoint enforces a shared 60-second deadline, including the remaining generation budget for OpenRouter and Gemini.
+- The RAG endpoint applies one shared 60-second deadline to bounded retrieval tasks and passes the remaining generation budget to OpenRouter/Gemini. Timed-out retrieval futures are cancelled when possible; a running native/provider call may finish in its worker after the request has returned.
 
 This is an implementation-in-progress note, not a test or acceptance claim. Unit tests have been added but have not been executed. The Web Backend and Frontend implementation and D40 E2E remain pending.
 
