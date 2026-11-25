@@ -315,16 +315,17 @@ def run_multi_query(
     context = build_context(fused)
     usage = None
     citations: list[dict[str, Any]] = []
-    answer = no_evidence_answer(question)
-    if answer.startswith("I could not"):
+    if no_evidence_answer(question).startswith("Tôi"):
         answer = (
-            "I could not find enough evidence in the repositories in this "
-            "conversation Scope to answer that question."
+            "Các repository trong Conversation Scope chưa cung cấp đủ bằng chứng. "
+            "Hãy kiểm tra lại Scope/Focus hoặc làm rõ nếu câu hỏi liên quan đến mã nguồn "
+            "nằm ngoài các repository đã lập chỉ mục."
         )
     else:
         answer = (
-            "Tôi không tìm thấy đủ bằng chứng trong các repository thuộc "
-            "Conversation Scope để trả lời câu hỏi này."
+            "The indexed repositories in this conversation Scope did not provide enough "
+            "evidence. Check the Scope/Focus selection or clarify if the question is about "
+            "code outside the indexed repositories."
         )
     answer_status = "no_evidence"
 
