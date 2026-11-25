@@ -443,7 +443,7 @@ def run_multi_query(
                         cited_fallback_names.append(name)
             if cited_fallback_names:
                 fallback_label = ", ".join(cited_fallback_names)
-                if answer.startswith("Tôi"):
+                if no_evidence_answer(question).startswith("Tôi"):
                     disclosure = (
                         "Repository trong Focus chưa cung cấp đủ bằng chứng; "
                         "câu trả lời này có sử dụng thêm nguồn trong Scope: "
