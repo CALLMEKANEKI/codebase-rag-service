@@ -164,4 +164,49 @@ The final owner decisions and detailed acceptance matrix are in the [D40 impleme
 - **Owner UX decisions (2026-11-25):** dismissing a repository-ready suggestion persists in browser storage per user + conversation + repository; dismissal never changes Scope. The Chat Header / Scope bar must always show a persistent **+ Add repository** button, even when suggestions are dismissed or Scope is full. It opens the Scope manager; at the 5-repository cap the manager explains the limit and blocks adding a sixth, but the + button remains visible/clickable. See §12 of the consolidated v2 contract.
 - Do not change `contracts/openapi.yaml` before explicit project-owner approval of the consolidated contract.
 
-The 2026-11-21 E2E report remains a historical baseline, not a D40 acceptance report. No D40 implementation or E2E pass is claimed yet.
+The 2026-11-21 E2E report remains a historical baseline, not a D40 acceptance report. The RAG multi-index endpoint has an initial implementation on this branch; unit tests are added but have not been run. Web implementation and D40 acceptance remain pending.
+
+
+## 5. Multi-index query (D40 Contract v2)
+
+The approved additive endpoint is `POST /v1/query/multi`. Keep using `POST /v1/query` for the legacy single-index flow.
+
+Web Backend must send only the repositories in the authorized Conversation Scope. Resolve each Web Repository ID to its current READY RAG `index_id` server-side; never accept `index_id` from the browser.
+
+Example server-to-server request:
+
+```json
+{
+  "question": "Trace how an order response is produced and consumed.",
+  "scope": [
+    {
+      "repository_id": "web-repository-guid-a",
+      "index_id": "idx_backend_a",
+      "display_name": "orders-api"
+    },
+    {
+      "repository_id": "web-repository-guid-b",
+      "index_id": "idx_client_b",
+      "display_name": "orders-client"
+    }
+  ],
+  "focus_repository_ids": ["web-repository-guid-a"],
+  "top_k": 8,
+  "options": {
+    "mode": "hybrid",
+    "rerank": false
+  },
+  "debug": false
+}
+```
+
+Contract behavior:
+- `scope` contains 1–5 unique repositories/indexes; RAG rejects duplicates and never truncates Scope.
+- `focus_repository_ids` must be a subset of Scope. Empty or omitted Focus means search all Scope repositories.
+- Focus is a soft priority. RAG searches Focus first; its initial deterministic heuristic requires at least two non-empty chunks across Focus to skip fallback. Otherwise it searches the remaining Scope repositories.
+- RAG fuses retrieved evidence, preserves repository/index/commit provenance, and makes one final generation.
+- Each Scope repository has one `repository_outcomes` entry: `searched_with_evidence`, `searched_no_evidence`, `unavailable`, `failed`, or `not_searched`.
+- HTTP 200 can represent completed or partial execution. HTTP 503 `ALL_INDEXES_UNAVAILABLE` means no supplied index could be queried. HTTP 504 `TIMEOUT` means the shared 60-second RAG deadline elapsed.
+- The browser-facing Web DTO must replace RAG index IDs with Web repository IDs and display names. Do not expose `index_id` in browser responses, history, or citations.
+
+This branch contains the initial RAG implementation only. Do not treat it as D40 acceptance: the added unit tests and Web/RAG E2E have not yet been run.
