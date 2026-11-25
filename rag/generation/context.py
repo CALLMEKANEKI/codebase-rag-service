@@ -45,6 +45,13 @@ def build_context(
             start = int(chunk.get("start_line") or 1)
             end = int(chunk.get("end_line") or start)
             symbol = chunk.get("qualname") or chunk.get("symbol_name")
+            repository = chunk.get("display_name")
+            commit_sha = chunk.get("commit_sha")
+            if repository:
+                header += f" [{repository}"
+                if commit_sha:
+                    header += f" @ {str(commit_sha)[:12]}"
+                header += "]"
             header += f" {path}:{start}-{end}"
             if symbol:
                 header += f" ({symbol})"
