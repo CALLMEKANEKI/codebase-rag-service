@@ -15,7 +15,11 @@ class FakeLanguageModel:
         self.calls = 0
     def generate(self, *, question, context):
         self.calls += 1
-        return type("Generated", (), {"text": self.text, "input_tokens": 3, "output_tokens": 2})()
+        return type(
+            "Generated",
+            (),
+            {"text": self.text, "input_tokens": 3, "output_tokens": 2},
+        )()
 
 
 class FakeRegistry:
@@ -62,7 +66,12 @@ def test_multi_query_uses_focused_evidence_without_searching_rest(tmp_path):
     }
     root, service, model, registry = setup(
         tmp_path,
-        {"idx_a": [make_result(make_chunk("a1", "first")), make_result(make_chunk("a2", "second"))]},
+        {
+            "idx_a": [
+                make_result(make_chunk("a1", "first")),
+                make_result(make_chunk("a2", "second")),
+            ]
+        },
         rows,
     )
     result = run_multi_query(
@@ -93,7 +102,10 @@ def test_multi_query_falls_back_inside_scope_and_keeps_citation_provenance(tmp_p
         tmp_path,
         {
             "idx_a": [make_result(make_chunk("a1", "only one focused chunk"))],
-            "idx_b": [make_result(make_chunk("b1", "fallback one")), make_result(make_chunk("b2", "fallback two"))],
+            "idx_b": [
+                make_result(make_chunk("b1", "fallback one")),
+                make_result(make_chunk("b2", "fallback two")),
+            ],
         },
         rows,
     )
@@ -115,7 +127,10 @@ def test_multi_query_falls_back_inside_scope_and_keeps_citation_provenance(tmp_p
     assert result["focus"]["fallback_triggered"] is True
     assert result["focus"]["fallback_reason"] == "focused_evidence_insufficient"
     assert result["focus"]["fallback_repository_ids"] == ["repo-b"]
-    assert all("repository_id" in citation and "index_id" in citation for citation in result["citations"])
+    assert all(
+        "repository_id" in citation and "index_id" in citation
+        for citation in result["citations"]
+    )
     assert "fallback source" in result["answer"]
     assert model.calls == 1
 
@@ -125,7 +140,9 @@ def test_multi_query_rejects_focus_outside_scope(tmp_path):
     try:
         run_multi_query(
             question="Explain this code",
-            scope=[{"repository_id": "repo-a", "index_id": "idx_a", "display_name": "A"}],
+            scope=[
+                {"repository_id": "repo-a", "index_id": "idx_a", "display_name": "A"}
+            ],
             focus_repository_ids=["repo-b"],
             top_k=4,
             mode="dense",
@@ -145,7 +162,13 @@ def test_multi_query_reports_all_sources_unavailable(tmp_path):
     try:
         run_multi_query(
             question="Explain this code",
-            scope=[{"repository_id": "repo-a", "index_id": "idx_missing", "display_name": "A"}],
+            scope=[
+                {
+                    "repository_id": "repo-a",
+                    "index_id": "idx_missing",
+                    "display_name": "A",
+                }
+            ],
             focus_repository_ids=[],
             top_k=4,
             mode="dense",
