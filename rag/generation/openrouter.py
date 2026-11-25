@@ -42,6 +42,19 @@ class OpenRouterLanguageModel:
         )
 
     def generate(self, *, question: str, context: str) -> GenerationResult:
+        return self.generate_with_timeout(
+            question=question,
+            context=context,
+            timeout_seconds=self.timeout_seconds,
+        )
+
+    def generate_with_timeout(
+        self,
+        *,
+        question: str,
+        context: str,
+        timeout_seconds: float,
+    ) -> GenerationResult:
         messages = [
             {"role": "system", "content": SYSTEM_INSTRUCTION},
             {
@@ -56,7 +69,7 @@ class OpenRouterLanguageModel:
                 ),
             },
         ]
-        deadline = time.monotonic() + self.timeout_seconds
+        deadline = time.monotonic() + max(0.05, min(timeout_seconds, self.timeout_seconds))
         last_error: Exception | None = None
 
         for position, model in enumerate(self.models, start=1):
