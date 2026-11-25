@@ -230,10 +230,21 @@ For each test case, record:
 
 A citation opening at the correct path/line proves navigation integrity only; it does not by itself prove semantic relevance or answer correctness.
 
+## 5.1 Final owner UX decisions (2026-11-25)
+
+- Repository-ready suggestion dismissal is persisted in browser storage keyed by `userId + conversationId + repositoryId`; it survives reloads and revisits.
+- Dismissal only hides that suggestion. It does not modify Conversation Scope or Focus.
+- A newly imported repository with a new Web Repository ID is a new suggestion.
+- The Chat Header / Conversation Scope bar MUST always show a persistent **+ Add repository** control, regardless of whether a suggestion exists or has been dismissed.
+- The + control opens the Scope manager. It remains visible and clickable at the Scope cap; the manager explains the maximum (default 5) and prevents adding another repository.
+- Dismissing a suggestion MUST NOT hide, disable or replace the + Add repository control.
+- Scope manager should provide a way to view/reopen dismissed suggestions; this does not replace the always-visible + control.
+
 ## 6. Definition of done
 
 - [ ] Conversation starts with one READY repository; user can manually add/remove scope members.
-- [ ] New repository notification is non-blocking and requires explicit confirmation.
+- [ ] New repository notification is non-blocking and requires explicit confirmation; dismissal persists per user/conversation/repository across reloads.
+- [ ] A persistent + Add repository control is always visible in the Chat Header / Scope bar, even after notification dismissal and at the Scope cap; clicking it opens the Scope manager.
 - [ ] Focus supports none / one / arbitrary multiple repositories and is per-message.
 - [ ] Scope is the hard boundary; focus is a soft retrieval priority within that boundary.
 - [ ] Focused-first retrieval and fallback to remaining in-scope repositories are demonstrated by traces/tests.
