@@ -9,7 +9,7 @@ import httpx
 from rag.generation.citations import no_evidence_answer, validate_citations
 from rag.generation.context import build_context
 from rag.retrieval.bm25 import BM25Retriever
-from rag.retrieval.dense import RetrievedChunk, DenseRetriever
+from rag.retrieval.dense import RetrievedChunk
 from rag.retrieval.hybrid import HybridRetriever
 from rag.retrieval.reranker import CrossEncoderReranker, RerankingRetriever
 
@@ -250,6 +250,8 @@ def run_multi_query(
         item["outcome"] in {"searched_with_evidence", "searched_no_evidence"}
         for item in focused_outcomes
     )
+    # Initial measurable policy: two non-empty chunks across the selected Focus
+    # are sufficient to avoid expanding retrieval; fewer trigger in-Scope fallback.
     focused_evidence_count = sum(item["evidence_count"] for item in focused_outcomes)
     focus_sufficient = (
         not focus_repository_ids
@@ -268,15 +270,19 @@ def run_multi_query(
             search_repository(repository, is_fallback=True)
     elif remaining:
         for repository in remaining:
+            existing_row = registry.get(repository["index_id"])
             outcomes[repository["repository_id"]] = {
                 "repository_id": repository["repository_id"],
                 "index_id": repository["index_id"],
-                "commit_sha": None,
+                "commit_sha": existing_row.get("commit_sha") if existing_row else None,
                 "outcome": "not_searched",
                 "reason": "focus_evidence_sufficient",
                 "evidence_count": 0,
                 "latency_ms": None,
             }
+
+    if time.monotonic() >= deadline:
+        raise TimeoutError("Multi-index request deadline elapsed")
 
     # Scope order is preserved in the response regardless of retrieval order.
     repository_outcomes = [outcomes[item["repository_id"]] for item in scope]
