@@ -50,7 +50,7 @@ The owner selected **RAG Multi-Index Orchestrator**. RAG is responsible for retr
 - RAG retrieves from focused indexes with priority, then expands to other supplied indexes in the same scope when evidence is insufficient.
 - RAG performs evidence-level fusion/deduplication and one coherent final generation. Do not fan out to the existing single-index endpoint and concatenate independently generated answers.
 - Every evidence item and citation must retain repository/index provenance.
-- Current `POST /v1/query` accepts one `index_id`. A multi-index request/response contract is therefore a separate design deliverable. **Do not edit `contracts/openapi.yaml` until the proposal has been reviewed and explicitly approved by the project owner.**
+- Legacy `POST /v1/query` remains single-index and backward-compatible. The owner-approved additive multi-index contract is `POST /v1/query/multi`; `contracts/openapi.yaml` was updated to v0.3.0 on 2026-11-25.
 
 ### 2.4 History and citations — H2: immutable per-message snapshot
 
@@ -135,7 +135,7 @@ This is an implementation-in-progress note, not a test or acceptance claim. Unit
 
 The reviews from Web Backend (2026-11-23) and Frontend (2026-11-24) have been consolidated in [D40 Multi-Index API Contract Review v2](d40-multi-index-api-contract-review-v2.md). It supersedes the unresolved open-question list in the original proposal for the purpose of final owner review; the original proposal remains as review history. The consolidated draft adopts `POST /v1/query/multi`, a default Scope cap of 5, browser-safe DTOs with no `index_id`, Python-only paired fixtures, the fixed outcome/reason enums, and the 60/65/75-second timeout chain.
 
-**Approval gate remains:** this is still a review draft. Do not edit `contracts/openapi.yaml`, implement, merge, deploy, or claim D40 tests passed until the project owner approves the complete contract and resolves the remaining notification-dismissal decision.
+**Contract approval gate closed on 2026-11-25:** the project owner approved the complete Contract v2 and the repository-ready notification dismissal decision. The additive RAG OpenAPI update is complete. RAG implementation has begun on `work/wp6-retrieval-reranking`; Web implementation, tests/E2E, merge and deployment remain separate work/gates.
 
 
 The current single-index `POST /v1/query` is insufficient for this architecture. Before implementation of the Web↔RAG request shape, Web and RAG must prepare a short contract proposal covering:
@@ -146,7 +146,7 @@ The current single-index `POST /v1/query` is insufficient for this architecture.
 - Failure semantics: partial success, all-source failure, no evidence, invalid/not-ready index.
 - Size limits, ordering/budget policy, timeout and retry behavior.
 
-Review the proposal with the project owner first. Only after explicit approval may `contracts/openapi.yaml` and the Web/RAG implementations be changed. No OpenAPI change is authorized by this document alone.
+The project owner approved the consolidated Contract v2 on 2026-11-25. The approved OpenAPI change is recorded on the RAG branch; implementation and validation status are tracked in §3 and §11 below.
 
 ## 5. Acceptance test fixture and execution method
 
@@ -277,4 +277,4 @@ A citation opening at the correct path/line proves navigation integrity only; it
 
 Keep the 2026-11-21 report unchanged. Its 18-query latency and 82/82 citation-opening results remain historical baseline observations only; they do not validate D40.
 
-**No D40 implementation or E2E pass is claimed by this document.**
+**Status:** an initial RAG multi-index implementation and focused unit-test cases are present on the RAG branch. The tests have not been run; Web implementation and D40 E2E acceptance are still pending.
