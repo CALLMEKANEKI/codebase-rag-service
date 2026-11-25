@@ -24,6 +24,7 @@ from rag.embeddings.sentence_transformer import SentenceTransformerEmbedder
 from rag.generation.base import LLMError
 from rag.generation.factory import build_language_model
 from rag.generation.service import QueryService
+from rag.generation.multi_query import AllIndexesUnavailable, run_multi_query
 from rag.index_registry import IndexRegistry
 from rag.indexing_pipeline import IndexCancelled, run_indexing
 from rag.ingestion.clone import validate_repo_url
@@ -67,6 +68,43 @@ class QueryRequest(BaseModel):
     def question_not_blank(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("question must not be blank")
+        return value
+
+
+class MultiQueryOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: str = "hybrid"
+    rerank: bool = False
+
+
+class MultiQueryScopeItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    repository_id: str = Field(min_length=1, max_length=200)
+    index_id: str = Field(pattern=r"^idx_[A-Za-z0-9_-]+$")
+    display_name: str = Field(min_length=1, max_length=300)
+
+
+class MultiQueryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question: str = Field(min_length=1, max_length=2000)
+    scope: list[MultiQueryScopeItem] = Field(min_length=1, max_length=5)
+    focus_repository_ids: list[str] = Field(default_factory=list)
+    top_k: int = Field(default=8, ge=1, le=20)
+    options: MultiQueryOptions = Field(default_factory=MultiQueryOptions)
+    debug: bool = False
+
+    @field_validator("question")
+    @classmethod
+    def multi_question_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("question must not be blank")
+        return value
+
+    @field_validator("focus_repository_ids")
+    @classmethod
+    def focus_ids_not_blank(cls, value: list[str]) -> list[str]:
+        if any(not item.strip() for item in value):
+            raise ValueError("focus repository IDs must not be blank")
         return value
 
 
@@ -542,6 +580,90 @@ def create_app(
             "latency_ms": max(0, int((time.perf_counter() - started) * 1000)),
             "debug": result.debug,
         }
+
+    @app.post("/v1/query/multi", dependencies=[Depends(require_api_key)])
+    async def query_multiple(payload: MultiQueryRequest, request: Request):
+        scope = [item.model_dump() for item in payload.scope]
+        repository_ids = [item["repository_id"] for item in scope]
+        index_ids = [item["index_id"] for item in scope]
+        focus_ids = payload.focus_repository_ids
+
+        if len(set(repository_ids)) != len(repository_ids) or len(set(index_ids)) != len(index_ids):
+            raise APIError(
+                422,
+                "INVALID_REQUEST",
+                "Scope repository_id and index_id values must be unique",
+            )
+        if len(set(focus_ids)) != len(focus_ids):
+            raise APIError(
+                422,
+                "INVALID_REQUEST",
+                "focus_repository_ids must not contain duplicates",
+            )
+        if not set(focus_ids).issubset(repository_ids):
+            raise APIError(
+                422,
+                "INVALID_REQUEST",
+                "Every focused repository must belong to Scope",
+                {"field": "focus_repository_ids"},
+            )
+        if payload.options.mode not in {"dense", "bm25", "hybrid"}:
+            raise APIError(
+                422,
+                "INVALID_REQUEST",
+                "Retrieval mode must be dense, bm25, or hybrid",
+                {"field": "options.mode"},
+            )
+        if payload.options.rerank and payload.options.mode != "hybrid":
+            raise APIError(
+                422,
+                "INVALID_REQUEST",
+                "Reranking requires hybrid retrieval",
+                {"field": "options.rerank"},
+            )
+
+        service = request.app.state.query_service
+        if service is None:
+            service = _get_query_service(request.app)
+        runtime = request.app.state.embedding_runtime
+        vector_store = runtime[1] if runtime is not None else None
+        started = time.perf_counter()
+        try:
+            result = await run_in_threadpool(
+                run_multi_query,
+                question=payload.question,
+                scope=scope,
+                focus_repository_ids=focus_ids,
+                top_k=payload.top_k,
+                mode=payload.options.mode,
+                rerank=payload.options.rerank,
+                query_service=service,
+                registry=request.app.state.registry,
+                index_storage_path=request.app.state.settings.index_storage_path,
+                vector_store=vector_store,
+                timeout_seconds=60.0,
+            )
+        except AllIndexesUnavailable as exc:
+            raise APIError(
+                503,
+                "ALL_INDEXES_UNAVAILABLE",
+                "No supplied index is available for querying",
+                {"repository_outcomes": exc.repository_outcomes},
+            ) from exc
+        except (TimeoutError, httpx.TimeoutException) as exc:
+            raise APIError(504, "TIMEOUT", "The request timed out") from exc
+        except LLMError as exc:
+            raise APIError(
+                502, "LLM_ERROR", "The language model request failed"
+            ) from exc
+        except ValueError as exc:
+            raise APIError(
+                422, "INVALID_REQUEST", str(exc)
+            ) from exc
+
+        # Keep the public latency tied to the complete endpoint execution.
+        result["latency_ms"] = max(0, int((time.perf_counter() - started) * 1000))
+        return result
 
     return app
 
