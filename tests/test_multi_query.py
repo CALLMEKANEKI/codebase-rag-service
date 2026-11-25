@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from fastapi.testclient import TestClient
+
+from api.main import create_app
+from rag.config import Settings
 from rag.generation.multi_query import AllIndexesUnavailable, run_multi_query
 
 class FakeRetriever:
@@ -181,3 +185,73 @@ def test_multi_query_reports_all_sources_unavailable(tmp_path):
         assert exc.repository_outcomes[0]["reason"] == "index_not_found"
     else:
         raise AssertionError("all unavailable indexes must raise")
+
+
+
+def test_multi_query_endpoint_rejects_focus_outside_scope(tmp_path):
+    settings = Settings(
+        rag_api_key="test-key",
+        index_storage_path=tmp_path / "indexes",
+        index_registry_path=tmp_path / "index_registry.sqlite",
+    )
+    service = type(
+        "Service",
+        (),
+        {
+            "retriever": FakeRetriever({}),
+            "language_model": FakeLanguageModel(),
+        },
+    )()
+    client = TestClient(create_app(query_service=service, settings=settings))
+    response = client.post(
+        "/v1/query/multi",
+        headers={"X-API-Key": "test-key"},
+        json={
+            "question": "Explain this code",
+            "scope": [
+                {
+                    "repository_id": "repo-a",
+                    "index_id": "idx_a",
+                    "display_name": "A",
+                }
+            ],
+            "focus_repository_ids": ["repo-outside"],
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"
+
+
+def test_multi_query_endpoint_returns_503_when_all_indexes_are_unavailable(tmp_path):
+    settings = Settings(
+        rag_api_key="test-key",
+        index_storage_path=tmp_path / "indexes",
+        index_registry_path=tmp_path / "index_registry.sqlite",
+    )
+    service = type(
+        "Service",
+        (),
+        {
+            "retriever": FakeRetriever({}),
+            "language_model": FakeLanguageModel(),
+        },
+    )()
+    client = TestClient(create_app(query_service=service, settings=settings))
+    response = client.post(
+        "/v1/query/multi",
+        headers={"X-API-Key": "test-key"},
+        json={
+            "question": "Explain this code",
+            "scope": [
+                {
+                    "repository_id": "repo-a",
+                    "index_id": "idx_missing",
+                    "display_name": "A",
+                }
+            ],
+            "focus_repository_ids": [],
+        },
+    )
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "ALL_INDEXES_UNAVAILABLE"
+    assert response.json()["error"]["details"]["repository_outcomes"][0]["outcome"] == "unavailable"
