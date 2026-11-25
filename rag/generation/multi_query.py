@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,10 @@ from rag.retrieval.reranker import CrossEncoderReranker, RerankingRetriever
 
 _EVIDENCE_SUFFICIENCY_MIN_CHUNKS = 2
 _MAX_SCOPE = 5
+_RETRIEVAL_EXECUTOR = ThreadPoolExecutor(
+    max_workers=_MAX_SCOPE,
+    thread_name_prefix="rag-multi-retrieve",
+)
 
 
 def _non_empty_results(results: list[RetrievedChunk]) -> list[RetrievedChunk]:
@@ -203,17 +208,27 @@ def run_multi_query(
                 return
 
         try:
-            candidates = _non_empty_results(
-                _retrieve_for_index(
-                    index_id=index_id,
-                    question=question,
-                    top_k=min(20, max(top_k, 5)),
-                    mode=mode,
-                    rerank=rerank,
-                    query_service=query_service,
-                    index_storage_path=storage_root,
-                )
+            retrieval = _RETRIEVAL_EXECUTOR.submit(
+                _retrieve_for_index,
+                index_id=index_id,
+                question=question,
+                top_k=min(20, max(top_k, 5)),
+                mode=mode,
+                rerank=rerank,
+                query_service=query_service,
+                index_storage_path=storage_root,
             )
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                retrieval.cancel()
+                raise TimeoutError("Multi-index request deadline elapsed")
+            try:
+                candidates = _non_empty_results(
+                    retrieval.result(timeout=remaining_seconds)
+                )
+            except FutureTimeoutError as exc:
+                retrieval.cancel()
+                raise TimeoutError("Multi-index request deadline elapsed") from exc
         except (TimeoutError, httpx.TimeoutException):
             raise
         except OSError:
