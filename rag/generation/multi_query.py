@@ -225,6 +225,8 @@ def run_multi_query(
             outcome["latency_ms"] = max(0, int((time.monotonic() - source_started) * 1000))
             return
 
+        if time.monotonic() >= deadline:
+            raise TimeoutError("Multi-index request deadline elapsed")
         outcome["evidence_count"] = len(candidates)
         outcome["outcome"] = "searched_with_evidence" if candidates else "searched_no_evidence"
         outcome["reason"] = None
@@ -278,12 +280,11 @@ def run_multi_query(
 
     # Scope order is preserved in the response regardless of retrieval order.
     repository_outcomes = [outcomes[item["repository_id"]] for item in scope]
-    searched_count = sum(
-        item["outcome"] in {"searched_with_evidence", "searched_no_evidence"}
-        for item in repository_outcomes
-    )
     available_count = sum(
-        item["outcome"] not in {"unavailable", "failed"}
+        item["outcome"] in {
+            "searched_with_evidence",
+            "searched_no_evidence",
+        }
         for item in repository_outcomes
     )
     if available_count == 0:
