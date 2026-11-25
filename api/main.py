@@ -330,7 +330,7 @@ def create_app(
     query_service: QueryService | None = None,
     settings: Settings | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Codebase RAG Service", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="Codebase RAG Service", version="0.3.0", lifespan=lifespan)
     app.state.settings = settings or get_settings()
     app.state.query_service = query_service
     app.state.embedding_runtime = None
