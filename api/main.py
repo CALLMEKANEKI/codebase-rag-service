@@ -102,8 +102,13 @@ class MultiQueryRequest(BaseModel):
 
     @field_validator("scope")
     @classmethod
-    def scope_items_not_blank(cls, value: list[MultiQueryScopeItem]) -> list[MultiQueryScopeItem]:
-        if any(not item.repository_id.strip() or not item.display_name.strip() for item in value):
+    def scope_items_not_blank(
+        cls, value: list[MultiQueryScopeItem]
+    ) -> list[MultiQueryScopeItem]:
+        if any(
+            not item.repository_id.strip() or not item.display_name.strip()
+            for item in value
+        ):
             raise ValueError("Scope repository IDs and display names must not be blank")
         return value
 
@@ -595,7 +600,10 @@ def create_app(
         index_ids = [item["index_id"] for item in scope]
         focus_ids = payload.focus_repository_ids
 
-        if len(set(repository_ids)) != len(repository_ids) or len(set(index_ids)) != len(index_ids):
+        if (
+            len(set(repository_ids)) != len(repository_ids)
+            or len(set(index_ids)) != len(index_ids)
+        ):
             raise APIError(
                 422,
                 "INVALID_REQUEST",
