@@ -384,9 +384,13 @@ def run_multi_query(
             }
         ]
         if no_evidence_answer(question).startswith("Tôi"):
+            focus_label = (
+                ", ".join(focus_names)
+                if focus_names
+                else "không có; tìm trong toàn bộ Scope"
+            )
             guidance = (
-                "Repository được chọn làm Focus: "
-                f"{', '.join(focus_names) if focus_names else 'không có; tìm trong toàn bộ Scope'}. "
+                f"Repository được chọn làm Focus: {focus_label}. "
                 "Các repository fallback đã được thử: "
                 f"{', '.join(fallback_names) if fallback_names else 'không có'}. "
                 "Chỉ sử dụng các đoạn mã được cung cấp. Nếu bằng chứng đến "
@@ -394,9 +398,13 @@ def run_multi_query(
                 "hãy nói rõ điều đó trong câu trả lời."
             )
         else:
+            focus_label = (
+                ", ".join(focus_names)
+                if focus_names
+                else "none; search the full Scope"
+            )
             guidance = (
-                "User focus repositories: "
-                f"{', '.join(focus_names) if focus_names else 'none; search the full Scope'}. "
+                f"User focus repositories: {focus_label}. "
                 "Fallback repositories attempted: "
                 f"{', '.join(fallback_names) if fallback_names else 'none'}. "
                 "Use only the supplied excerpts. If evidence comes from a "
