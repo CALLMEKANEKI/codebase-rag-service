@@ -1,7 +1,7 @@
 # D40 — Consolidated Multi-Index API Contract Review (v2)
 
 Date: 2026-11-24  
-Status: **Consolidated review v2 — owner decisions in §12 resolved; pending final approval of the complete contract before OpenAPI/implementation.**  
+Status: **Approved Contract v2 (2026-11-25); RAG OpenAPI v0.3 updated. Implementation remains a separate approval gate.**  
 Supersedes the open review questions in [the original proposal](d40-multi-index-api-contract-proposal.md). The original proposal is retained as review history.
 
 ## 1. Inputs and authority
@@ -16,7 +16,7 @@ Priority rules:
 1. Owner decisions are authoritative.
 2. Backend/Frontend feedback is accepted where it does not conflict with owner decisions or security constraints.
 3. Any unresolved item is explicitly listed in §12; it is not silently treated as approved.
-4. This document does not authorize edits to `contracts/openapi.yaml`, implementation, merge, deployment, or E2E execution.
+4. Owner approval on 2026-11-25 authorizes aligning the RAG `contracts/openapi.yaml` with this contract. It does not authorize implementation, merge, deployment, or E2E execution.
 
 ## 2. Consolidated decisions
 
@@ -62,7 +62,7 @@ Priority rules:
 - Display of historical snapshots without recomputing them from current Scope.
 - No direct calls to RAG and no knowledge of internal RAG `index_id`.
 
-## 4. RAG API contract — proposed
+## 4. RAG API contract — approved
 
 ### 4.1 Endpoint and compatibility
 
@@ -238,7 +238,7 @@ Do not use `failed` or `unavailable` to represent a successful search with no ev
 
 Web maps RAG 503 `ALL_INDEXES_UNAVAILABLE` to browser-facing 503 `ALL_SOURCES_UNAVAILABLE`. The Web response must not leak index IDs.
 
-## 5. Web API contract — proposed
+## 5. Web API contract — approved design contract
 
 Web API JSON uses camelCase. These routes are the consolidated choice based on Web Backend's route review; they supersede the alternative full-scope PUT route in the FE sketch.
 
@@ -266,7 +266,7 @@ The Scope limit is 5 by default and configurable. Web rejects the sixth reposito
 
 ### 5.1 Browser-safe message DTO
 
-Illustrative shape only; final OpenAPI schemas remain gated:
+Illustrative Web-facing shape; Web OpenAPI/client updates remain the Web team's implementation work:
 
 ```json
 {
@@ -449,13 +449,13 @@ Behavior:
 
 ## 11. Approval gate and current status
 
-This consolidated v2 is a **review draft**, not the approved OpenAPI contract.
+The project owner explicitly approved the complete consolidated Contract v2 on **2026-11-25**. This approval authorizes updating the RAG `contracts/openapi.yaml` to the approved multi-index contract. The OpenAPI update is recorded on branch `work/wp6-retrieval-reranking`.
 
-Before implementation:
-1. Project owner resolves the open decision in §12.
-2. The repository-ready suggestion dismissal decision is now resolved by the owner in §12. The remaining gate is explicit approval of the complete consolidated contract.
-3. Only after that approval may RAG update `contracts/openapi.yaml` and Web pin the approved version.
-4. Implementation, migration, test execution, merge and deployment remain separate gates.
+Separate gates remain in force:
+1. RAG/Web implementation and database migration require implementation authorization.
+2. Test/E2E/benchmark execution remains separately controlled; no Eval Runner or benchmark is authorized by this approval.
+3. Merge and deployment require separate explicit approval.
+4. The existing `POST /v1/query` remains backward-compatible; the multi-index endpoint is additive.
 
 ## 12. Owner decision — resolved (2026-11-25)
 
@@ -475,7 +475,7 @@ Implementation contract:
 - Clicking it opens the Scope manager. At the 5-repository limit, the manager explains the limit and disables further additions, but the + control itself remains visible and usable to open the manager.
 - The recommendation banner and the + Add repository control are independent UI elements. Dismissing the banner must never hide the + control.
 
-This owner decision closes the product question previously listed in §12. The complete contract still requires explicit owner approval before OpenAPI changes or implementation.
+This owner decision closes the product question previously listed in §12. The complete contract was subsequently approved by the owner on 2026-11-25; see §11.
 
 ## 13. Related documents
 - [Original D40 Multi-Index API Contract Proposal](d40-multi-index-api-contract-proposal.md) — retained review history.
@@ -483,4 +483,4 @@ This owner decision closes the product question previously listed in §12. The c
 - [Web team local handoff](web-team-local-handoff.md).
 - [Historical Web ↔ RAG local E2E baseline (2026-11-21)](https://github.com/MinhVu309/codebase-rag-web/blob/main/docs/reports/e2e-local-2026-11-21.md).
 
-**No OpenAPI file has been changed. No implementation, CI, E2E or benchmark has been run as part of this consolidation.**
+**OpenAPI update:** `contracts/openapi.yaml` now contains the approved additive `POST /v1/query/multi` contract and supporting schemas. Legacy `POST /v1/query` is retained. No implementation, CI, E2E or benchmark has been run as part of this approval/update.
