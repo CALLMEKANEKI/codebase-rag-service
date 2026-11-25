@@ -1,7 +1,7 @@
 # D40 — Consolidated Multi-Index API Contract Review (v2)
 
 Date: 2026-11-24  
-Status: **Consolidated review draft — ready for project-owner decision; NOT an approved implementation contract.**  
+Status: **Consolidated review v2 — owner decisions in §12 resolved; pending final approval of the complete contract before OpenAPI/implementation.**  
 Supersedes the open review questions in [the original proposal](d40-multi-index-api-contract-proposal.md). The original proposal is retained as review history.
 
 ## 1. Inputs and authority
@@ -432,6 +432,10 @@ Behavior:
 - No Evidence is distinct from Failed/Unavailable.
 - History renders immutable Scope/Focus/source snapshots per message.
 - Repository-ready suggestion is non-blocking; never auto-adds a repository.
+- Dismissal is persisted browser-side, scoped by (user, conversation, repository); dismissing a suggestion does not remove the repository from Project or Conversation Scope. It remains dismissed across reloads. A newly imported/re-imported repository with a new Repository ID is a new suggestion.
+- The Chat Header / Conversation Scope bar MUST always show a persistent **+ Add repository** control, independent of whether any recommendation banner is visible or dismissed. This is the primary, always-available entry point for adding repositories to Scope; it opens the Scope manager and is not itself a notification.
+- The + control remains visible even when Scope is at its 5-repository cap. It opens the Scope manager, which explains the limit and prevents adding a sixth repository; do not hide the control or silently drop a selection. Existing Scope repositories can still be reviewed/removed there, subject to the cannot-remove-last-member rule.
+- Dismissing a repository-ready recommendation only dismisses that recommendation; it MUST NOT hide or disable the persistent + Add repository control.
 - Use Web repository IDs only in browser state and API payloads.
 
 ## 10. Rollout and compatibility
@@ -449,21 +453,29 @@ This consolidated v2 is a **review draft**, not the approved OpenAPI contract.
 
 Before implementation:
 1. Project owner resolves the open decision in §12.
-2. Project owner explicitly approves this consolidated contract.
-3. Only then may RAG update `contracts/openapi.yaml` and Web pin the approved version.
+2. The repository-ready suggestion dismissal decision is now resolved by the owner in §12. The remaining gate is explicit approval of the complete consolidated contract.
+3. Only after that approval may RAG update `contracts/openapi.yaml` and Web pin the approved version.
 4. Implementation, migration, test execution, merge and deployment remain separate gates.
 
-## 12. Remaining owner decision
+## 12. Owner decision — resolved (2026-11-25)
 
-**Repository-ready suggestion dismissal persistence (one unresolved product choice):**
-- Backend recommendation: store dismissal state in Frontend only; no Backend endpoint/DB field.
-- FE has designed “Để sau / Bỏ qua” but has not specified persistence across reloads.
-- Recommended MVP default: persist dismissal in browser storage scoped by (user, conversation, repository) so a dismissed suggestion does not reappear on refresh; show it again only if the repository is newly imported/re-imported as a new Repository record or the user explicitly reopens suggestions.
-- Alternative: session-only dismissal, which allows the suggestion to reappear after reload/reopen.
+The owner approved persistent browser-side dismissal for repository-ready suggestions.
 
-Owner decision required: **accept the recommended persistent browser-side dismissal, or choose session-only dismissal.**
+Implementation contract:
+- Store dismissal in browser storage scoped by `(userId, conversationId, repositoryId)`.
+- A dismissed suggestion stays dismissed across reloads and revisits to the same conversation.
+- Dismissal affects only the suggestion/banner; it does not add/remove repository membership and does not affect Scope or Focus.
+- A newly imported/re-imported repository represented by a new Web Repository ID is treated as a new suggestion.
+- Provide a way to explicitly reopen/view dismissed suggestions if the user wants to revisit them; this is separate from the always-visible add control.
+- No Backend endpoint or DB field is required for this MVP decision.
 
-All other technical points above are consolidated from the Backend and FE reviews and remain subject to final owner approval of the complete contract.
+**Additional owner UX requirement (2026-11-25):**
+- The Chat Header / Conversation Scope bar must always display a persistent **+ Add repository** button.
+- This control remains visible even when no repository-ready suggestion is present, when the suggestion has been dismissed, and when the Scope is at its maximum.
+- Clicking it opens the Scope manager. At the 5-repository limit, the manager explains the limit and disables further additions, but the + control itself remains visible and usable to open the manager.
+- The recommendation banner and the + Add repository control are independent UI elements. Dismissing the banner must never hide the + control.
+
+This owner decision closes the product question previously listed in §12. The complete contract still requires explicit owner approval before OpenAPI changes or implementation.
 
 ## 13. Related documents
 - [Original D40 Multi-Index API Contract Proposal](d40-multi-index-api-contract-proposal.md) — retained review history.
