@@ -100,6 +100,13 @@ class MultiQueryRequest(BaseModel):
             raise ValueError("question must not be blank")
         return value
 
+    @field_validator("scope")
+    @classmethod
+    def scope_items_not_blank(cls, value: list[MultiQueryScopeItem]) -> list[MultiQueryScopeItem]:
+        if any(not item.repository_id.strip() or not item.display_name.strip() for item in value):
+            raise ValueError("Scope repository IDs and display names must not be blank")
+        return value
+
     @field_validator("focus_repository_ids")
     @classmethod
     def focus_ids_not_blank(cls, value: list[str]) -> list[str]:
