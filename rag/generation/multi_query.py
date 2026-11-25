@@ -316,6 +316,16 @@ def run_multi_query(
     usage = None
     citations: list[dict[str, Any]] = []
     answer = no_evidence_answer(question)
+    if answer.startswith("I could not"):
+        answer = (
+            "I could not find enough evidence in the repositories in this "
+            "conversation Scope to answer that question."
+        )
+    else:
+        answer = (
+            "Tôi không tìm thấy đủ bằng chứng trong các repository thuộc "
+            "Conversation Scope để trả lời câu hỏi này."
+        )
     answer_status = "no_evidence"
 
     if context.sources:
@@ -358,6 +368,28 @@ def run_multi_query(
             context.sources,
             question=question,
         )
+        if citations and fallback_triggered:
+            cited_fallback_names = []
+            sources_by_ref = {item.ref_id: item.chunk for item in context.sources}
+            for citation in citations:
+                source_chunk = sources_by_ref[citation["ref_id"]]
+                if source_chunk.get("used_as_fallback"):
+                    name = str(source_chunk.get("display_name") or "another in-Scope repository")
+                    if name not in cited_fallback_names:
+                        cited_fallback_names.append(name)
+            if cited_fallback_names:
+                fallback_label = ", ".join(cited_fallback_names)
+                if answer.startswith("Tôi"):
+                    disclosure = (
+                        "Repository trong Focus chưa cung cấp đủ bằng chứng; "
+                        f"câu trả lời này có sử dụng thêm nguồn trong Scope: {fallback_label}.\n\n"
+                    )
+                else:
+                    disclosure = (
+                        "The selected Focus did not provide enough evidence; "
+                        f"this answer also uses in-Scope fallback source(s): {fallback_label}.\n\n"
+                    )
+                answer = disclosure + answer
         answer_status = "answered" if citations else "no_evidence"
         if generated.input_tokens is not None or generated.output_tokens is not None:
             usage = {
