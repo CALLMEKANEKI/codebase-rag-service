@@ -69,7 +69,9 @@ class OpenRouterLanguageModel:
                 ),
             },
         ]
-        deadline = time.monotonic() + max(0.05, min(timeout_seconds, self.timeout_seconds))
+        deadline = time.monotonic() + max(
+            0.05, min(timeout_seconds, self.timeout_seconds)
+        )
         last_error: Exception | None = None
 
         for position, model in enumerate(self.models, start=1):
