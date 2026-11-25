@@ -99,7 +99,6 @@ def _fuse_by_repository(
         if not progressed:
             break
 
-    ordered.sort(key=lambda item: (-item["score"], item["repository_id"], str(item["chunk"].get("chunk_id") or "")))
     return [
         RetrievedChunk(chunk=item["chunk"], score=item["score"], rank=rank)
         for rank, item in enumerate(ordered[:top_k], start=1)
@@ -364,9 +363,12 @@ def run_multi_query(
         "focus": {
             "requested_repository_ids": focus_repository_ids,
             "searched_focus_repository_ids": [
-                item["repository_id"]
-                for item in focused
-                if outcomes[item["repository_id"]]["outcome"] != "not_searched"
+                repository_id
+                for repository_id in focus_repository_ids
+                if outcomes[repository_id]["outcome"] in {
+                    "searched_with_evidence",
+                    "searched_no_evidence",
+                }
             ],
             "fallback_repository_ids": [
                 item["repository_id"]
