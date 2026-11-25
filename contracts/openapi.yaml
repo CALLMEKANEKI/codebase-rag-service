@@ -630,6 +630,7 @@ components:
         - REPO_TOO_LARGE
         - INVALID_REPO
         - INVALID_REQUEST
+        - ALL_INDEXES_UNAVAILABLE
         - INDEX_NOT_READY
         - INDEX_NOT_FOUND
         - FILE_NOT_FOUND
