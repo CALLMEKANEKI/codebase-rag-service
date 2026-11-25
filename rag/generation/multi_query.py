@@ -79,7 +79,11 @@ def _fuse_by_repository(
             key = (repository["index_id"], chunk_id or str(id(result.chunk)))
             item = fused_by_key.setdefault(
                 key,
-                {"chunk": chunk, "score": 0.0, "repository_id": repository["repository_id"]},
+                {
+                    "chunk": chunk,
+                    "score": 0.0,
+                    "repository_id": repository["repository_id"],
+                },
             )
             item["score"] += 1.0 / (60 + result.rank)
             ranked.append(item)
@@ -133,7 +137,10 @@ def run_multi_query(
         raise ValueError("scope must contain between 1 and 5 repositories")
     repository_ids = [item["repository_id"] for item in scope]
     index_ids = [item["index_id"] for item in scope]
-    if len(set(repository_ids)) != len(repository_ids) or len(set(index_ids)) != len(index_ids):
+    if (
+        len(set(repository_ids)) != len(repository_ids)
+        or len(set(index_ids)) != len(index_ids)
+    ):
         raise ValueError("scope repository_id and index_id values must be unique")
     if len(set(focus_repository_ids)) != len(focus_repository_ids):
         raise ValueError("focus_repository_ids must be unique")
@@ -151,7 +158,11 @@ def run_multi_query(
         else list(scope)
     )
     remaining = (
-        [item for item in scope if item["repository_id"] not in set(focus_repository_ids)]
+        [
+            item
+            for item in scope
+            if item["repository_id"] not in set(focus_repository_ids)
+        ]
         if focus_repository_ids
         else []
     )
@@ -179,32 +190,44 @@ def run_multi_query(
         row = registry.get(index_id)
         if row is None:
             outcome.update(outcome="unavailable", reason="index_not_found")
-            outcome["latency_ms"] = max(0, int((time.monotonic() - source_started) * 1000))
+            outcome["latency_ms"] = max(
+                0, int((time.monotonic() - source_started) * 1000)
+            )
             return
         outcome["commit_sha"] = row.get("commit_sha")
         if row.get("status") != "ready":
             outcome.update(outcome="unavailable", reason="index_not_ready")
-            outcome["latency_ms"] = max(0, int((time.monotonic() - source_started) * 1000))
+            outcome["latency_ms"] = max(
+                0, int((time.monotonic() - source_started) * 1000)
+            )
             return
 
         index_root = storage_root / index_id
         if not (index_root / "manifest.json").is_file():
             outcome.update(outcome="unavailable", reason="index_not_found")
-            outcome["latency_ms"] = max(0, int((time.monotonic() - source_started) * 1000))
+            outcome["latency_ms"] = max(
+                0, int((time.monotonic() - source_started) * 1000)
+            )
             return
         if mode in {"bm25", "hybrid"} and not (index_root / "bm25.sqlite3").is_file():
             outcome.update(outcome="unavailable", reason="storage_error")
-            outcome["latency_ms"] = max(0, int((time.monotonic() - source_started) * 1000))
+            outcome["latency_ms"] = max(
+                0, int((time.monotonic() - source_started) * 1000)
+            )
             return
         if vector_store is not None and mode in {"dense", "hybrid"}:
             try:
                 if not vector_store.collection_exists(index_id):
                     outcome.update(outcome="unavailable", reason="index_not_ready")
-                    outcome["latency_ms"] = max(0, int((time.monotonic() - source_started) * 1000))
+                    outcome["latency_ms"] = max(
+                0, int((time.monotonic() - source_started) * 1000)
+            )
                     return
             except Exception:
                 outcome.update(outcome="unavailable", reason="storage_error")
-                outcome["latency_ms"] = max(0, int((time.monotonic() - source_started) * 1000))
+                outcome["latency_ms"] = max(
+                0, int((time.monotonic() - source_started) * 1000)
+            )
                 return
 
         try:
@@ -233,17 +256,23 @@ def run_multi_query(
             raise
         except OSError:
             outcome.update(outcome="unavailable", reason="storage_error")
-            outcome["latency_ms"] = max(0, int((time.monotonic() - source_started) * 1000))
+            outcome["latency_ms"] = max(
+                0, int((time.monotonic() - source_started) * 1000)
+            )
             return
         except Exception:
             outcome.update(outcome="failed", reason="retrieval_error")
-            outcome["latency_ms"] = max(0, int((time.monotonic() - source_started) * 1000))
+            outcome["latency_ms"] = max(
+                0, int((time.monotonic() - source_started) * 1000)
+            )
             return
 
         if time.monotonic() >= deadline:
             raise TimeoutError("Multi-index request deadline elapsed")
         outcome["evidence_count"] = len(candidates)
-        outcome["outcome"] = "searched_with_evidence" if candidates else "searched_no_evidence"
+        outcome["outcome"] = (
+            "searched_with_evidence" if candidates else "searched_no_evidence"
+        )
         outcome["reason"] = None
         outcome["latency_ms"] = max(0, int((time.monotonic() - source_started) * 1000))
         if candidates:
@@ -252,7 +281,11 @@ def run_multi_query(
                 "index_id": index_id,
                 "display_name": repository["display_name"],
                 "commit_sha": row.get("commit_sha"),
-                "focused": "true" if repository_id in set(focus_repository_ids) else "false",
+                "focused": (
+                    "true"
+                    if repository_id in set(focus_repository_ids)
+                    else "false"
+                ),
                 "used_as_fallback": "true" if is_fallback else "false",
             }
             retrieved_groups.append((metadata, candidates))
@@ -273,7 +306,9 @@ def run_multi_query(
         or focused_evidence_count >= _EVIDENCE_SUFFICIENCY_MIN_CHUNKS
     )
 
-    fallback_triggered = bool(focus_repository_ids and remaining and not focus_sufficient)
+    fallback_triggered = bool(
+        focus_repository_ids and remaining and not focus_sufficient
+    )
     fallback_reason = None
     if fallback_triggered:
         fallback_reason = (
@@ -318,13 +353,16 @@ def run_multi_query(
     if no_evidence_answer(question).startswith("Tôi"):
         answer = (
             "Các repository trong Conversation Scope chưa cung cấp đủ bằng chứng. "
-            "Hãy kiểm tra lại Scope/Focus hoặc làm rõ nếu câu hỏi liên quan đến mã nguồn "
+            "Hãy kiểm tra lại Scope/Focus hoặc làm rõ nếu câu hỏi liên quan "
+            "đến mã nguồn "
             "nằm ngoài các repository đã lập chỉ mục."
         )
     else:
         answer = (
-            "The indexed repositories in this conversation Scope did not provide enough "
-            "evidence. Check the Scope/Focus selection or clarify if the question is about "
+            "The indexed repositories in this conversation Scope did not "
+            "provide enough "
+            "evidence. Check the Scope/Focus selection or clarify if the "
+            "question is about "
             "code outside the indexed repositories."
         )
     answer_status = "no_evidence"
@@ -347,16 +385,22 @@ def run_multi_query(
         ]
         if no_evidence_answer(question).startswith("Tôi"):
             guidance = (
-                f"Repository được chọn làm Focus: {', '.join(focus_names) if focus_names else 'không có; tìm trong toàn bộ Scope'}. "
-                f"Các repository fallback đã được thử: {', '.join(fallback_names) if fallback_names else 'không có'}. "
-                "Chỉ sử dụng các đoạn mã được cung cấp. Nếu bằng chứng đến từ repository fallback, "
+                "Repository được chọn làm Focus: "
+                f"{', '.join(focus_names) if focus_names else 'không có; tìm trong toàn bộ Scope'}. "
+                "Các repository fallback đã được thử: "
+                f"{', '.join(fallback_names) if fallback_names else 'không có'}. "
+                "Chỉ sử dụng các đoạn mã được cung cấp. Nếu bằng chứng đến "
+                "từ repository fallback, "
                 "hãy nói rõ điều đó trong câu trả lời."
             )
         else:
             guidance = (
-                f"User focus repositories: {', '.join(focus_names) if focus_names else 'none; search the full Scope'}. "
-                f"Fallback repositories attempted: {', '.join(fallback_names) if fallback_names else 'none'}. "
-                "Use only the supplied excerpts. If evidence comes from a fallback repository, "
+                "User focus repositories: "
+                f"{', '.join(focus_names) if focus_names else 'none; search the full Scope'}. "
+                "Fallback repositories attempted: "
+                f"{', '.join(fallback_names) if fallback_names else 'none'}. "
+                "Use only the supplied excerpts. If evidence comes from a "
+                "fallback repository, "
                 "make that explicit in the answer."
             )
         model = query_service.language_model
@@ -383,7 +427,10 @@ def run_multi_query(
             for citation in citations:
                 source_chunk = sources_by_ref[citation["ref_id"]]
                 if source_chunk.get("used_as_fallback"):
-                    name = str(source_chunk.get("display_name") or "another in-Scope repository")
+                    name = str(
+                        source_chunk.get("display_name")
+                        or "another in-Scope repository"
+                    )
                     if name not in cited_fallback_names:
                         cited_fallback_names.append(name)
             if cited_fallback_names:
@@ -391,26 +438,34 @@ def run_multi_query(
                 if answer.startswith("Tôi"):
                     disclosure = (
                         "Repository trong Focus chưa cung cấp đủ bằng chứng; "
-                        f"câu trả lời này có sử dụng thêm nguồn trong Scope: {fallback_label}.\n\n"
+                        "câu trả lời này có sử dụng thêm nguồn trong Scope: "
+                        f"{fallback_label}.\n\n"
                     )
                 else:
                     disclosure = (
                         "The selected Focus did not provide enough evidence; "
-                        f"this answer also uses in-Scope fallback source(s): {fallback_label}.\n\n"
+                        "this answer also uses in-Scope fallback source(s): "
+                        f"{fallback_label}.\n\n"
                     )
                 answer = disclosure + answer
         answer_status = "answered" if citations else "no_evidence"
         if not citations:
-            if answer.startswith("Tôi") or no_evidence_answer(question).startswith("Tôi"):
+            if answer.startswith("Tôi") or no_evidence_answer(question).startswith(
+                "Tôi"
+            ):
                 answer = (
-                    "Các repository trong Conversation Scope chưa cung cấp đủ bằng chứng. "
-                    "Hãy kiểm tra lại Scope/Focus hoặc làm rõ nếu câu hỏi liên quan đến mã nguồn "
+                    "Các repository trong Conversation Scope chưa cung cấp "
+                    "đủ bằng chứng. "
+                    "Hãy kiểm tra lại Scope/Focus hoặc làm rõ nếu câu hỏi liên quan "
+            "đến mã nguồn "
                     "nằm ngoài các repository đã lập chỉ mục."
                 )
             else:
                 answer = (
-                    "The indexed repositories in this conversation Scope did not provide enough "
-                    "evidence. Check the Scope/Focus selection or clarify if the question is about "
+                    "The indexed repositories in this conversation Scope did not "
+            "provide enough "
+                    "evidence. Check the Scope/Focus selection or clarify if the "
+            "question is about "
                     "code outside the indexed repositories."
                 )
         if generated.input_tokens is not None or generated.output_tokens is not None:
@@ -419,7 +474,11 @@ def run_multi_query(
                 "output_tokens": generated.output_tokens,
             }
         for citation in citations:
-            source = next(item for item in context.sources if item.ref_id == citation["ref_id"])
+            source = next(
+                item
+                for item in context.sources
+                if item.ref_id == citation["ref_id"]
+            )
             chunk = source.chunk
             citation.update(
                 repository_id=chunk["repository_id"],
@@ -429,7 +488,10 @@ def run_multi_query(
 
     execution_status = (
         "partial"
-        if any(item["outcome"] in {"unavailable", "failed"} for item in repository_outcomes)
+        if any(
+            item["outcome"] in {"unavailable", "failed"}
+            for item in repository_outcomes
+        )
         else "completed"
     )
     return {
