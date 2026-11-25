@@ -75,6 +75,21 @@ Removing a repository from scope or deleting it later must not rewrite old messa
 
 ## 3. Required implementation changes and ownership
 
+### RAG implementation note (2026-11-25)
+
+The first RAG implementation pass is now present on `work/wp6-retrieval-reranking`:
+- Additive `POST /v1/query/multi`; legacy `POST /v1/query` remains in place.
+- Scope is bounded to 1–5 repositories; duplicate repository/index IDs and Focus outside Scope are rejected.
+- Focused indexes are queried first. The initial deterministic sufficiency heuristic is **at least two non-empty retrieved chunks across Focus**; below that threshold, RAG searches the remaining Scope repositories. This is a retrieval-expansion heuristic, not a claim of semantic certainty.
+- Evidence is fused across repositories, context is interleaved to reduce single-repository crowding, and one final generation is performed.
+- Citations carry repository ID, RAG index ID and commit SHA alongside existing file/line provenance.
+- Per-repository outcomes distinguish evidence, no evidence, unavailable, failed and not searched; all-source unavailability maps to 503.
+- The RAG endpoint enforces a shared 60-second deadline, including the remaining generation budget for OpenRouter and Gemini.
+
+This is an implementation-in-progress note, not a test or acceptance claim. Unit tests have been added but have not been executed. The Web Backend and Frontend implementation and D40 E2E remain pending.
+
+## 3. Required implementation changes and ownership
+
 ### Web Frontend
 
 1. Conversation creation selects one READY repository by default.
