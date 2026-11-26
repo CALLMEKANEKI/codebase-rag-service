@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+import threading
+import time
 
 from api.main import create_app
 from rag.config import Settings
@@ -255,3 +257,83 @@ def test_multi_query_endpoint_returns_503_when_all_indexes_are_unavailable(tmp_p
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "ALL_INDEXES_UNAVAILABLE"
     assert response.json()["error"]["details"]["repository_outcomes"][0]["outcome"] == "unavailable"
+
+
+
+def test_multi_query_searches_scope_indexes_in_parallel(tmp_path):
+    barrier = threading.Barrier(2)
+
+    class ConcurrentRetriever:
+        def retrieve(self, index_id, question, top_k=10):
+            barrier.wait(timeout=2)
+            return [make_result(make_chunk(index_id, f"evidence from {index_id}"))]
+
+    rows = {
+        "idx_a": {"status": "ready", "commit_sha": "a" * 40},
+        "idx_b": {"status": "ready", "commit_sha": "b" * 40},
+    }
+    root, service, model, registry = setup(tmp_path, {}, rows)
+    service.retriever = ConcurrentRetriever()
+
+    result = run_multi_query(
+        question="Explain this code",
+        scope=[
+            {"repository_id": "repo-a", "index_id": "idx_a", "display_name": "A"},
+            {"repository_id": "repo-b", "index_id": "idx_b", "display_name": "B"},
+        ],
+        focus_repository_ids=[],
+        top_k=4,
+        mode="dense",
+        rerank=False,
+        query_service=service,
+        registry=registry,
+        index_storage_path=root,
+    )
+
+    assert [item["outcome"] for item in result["repository_outcomes"]] == [
+        "searched_with_evidence",
+        "searched_with_evidence",
+    ]
+    assert model.calls == 1
+
+
+def test_timed_out_focus_source_does_not_block_in_scope_fallback(tmp_path, monkeypatch):
+    import rag.generation.multi_query as multi_query
+
+    class SlowFocusRetriever:
+        def retrieve(self, index_id, question, top_k=10):
+            if index_id == "idx_a":
+                time.sleep(0.08)
+                return [make_result(make_chunk("a1", "late focus evidence"))]
+            return [make_result(make_chunk("b1", "fallback evidence"))]
+
+    monkeypatch.setattr(multi_query, "_PER_INDEX_TIMEOUT_SECONDS", 0.01)
+    rows = {
+        "idx_a": {"status": "ready", "commit_sha": "a" * 40},
+        "idx_b": {"status": "ready", "commit_sha": "b" * 40},
+    }
+    root, service, model, registry = setup(tmp_path, {}, rows)
+    service.retriever = SlowFocusRetriever()
+    model.text = "Fallback evidence found [1]."
+
+    result = run_multi_query(
+        question="Explain this code",
+        scope=[
+            {"repository_id": "repo-a", "index_id": "idx_a", "display_name": "A"},
+            {"repository_id": "repo-b", "index_id": "idx_b", "display_name": "B"},
+        ],
+        focus_repository_ids=["repo-a"],
+        top_k=4,
+        mode="dense",
+        rerank=False,
+        query_service=service,
+        registry=registry,
+        index_storage_path=root,
+    )
+
+    assert result["repository_outcomes"][0]["outcome"] == "failed"
+    assert result["repository_outcomes"][0]["reason"] == "timeout"
+    assert result["repository_outcomes"][1]["outcome"] == "searched_with_evidence"
+    assert result["focus"]["fallback_triggered"] is True
+    assert result["focus"]["fallback_repository_ids"] == ["repo-b"]
+    assert model.calls == 1
