@@ -289,6 +289,9 @@ paths:
         RAG truy van Focus truoc; neu evidence chua du, co the fallback sang cac repository khac
         trong Scope. RAG fusion evidence, deduplicate va chi tao mot cau tra loi cuoi cung.
         Khong duoc truy van index ngoai Scope. Focus rong nghia la truy van toan bo Scope.
+        MVP sufficiency heuristic: Focus duoc coi la du khi co it nhat hai non-empty chunks
+        tren cac repository Focus da truy van. Day la proxy dinh luong, khong phai danh gia
+        ngu nghia rang buoc cau hoi voi evidence.
         Moi request co mot absolute deadline toi da 60 giay, bao gom retrieval, fallback,
         fusion, generation va tat ca model fallback attempts. Khong tu dong retry POST.
         Endpoint nay chi duoc goi boi Web Backend; index_id la trusted server-to-server data.
@@ -364,6 +367,7 @@ paths:
                     score: 0.91
                 usage: null
                 latency_ms: 920
+                debug: null
         '401':
           $ref: '#/components/responses/Unauthorized'
         '422':
@@ -1095,6 +1099,7 @@ components:
         - repository_outcomes
         - citations
         - latency_ms
+        - debug
       properties:
         execution_status:
           type: string
