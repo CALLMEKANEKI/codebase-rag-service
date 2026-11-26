@@ -9,6 +9,7 @@ from api.main import create_app
 from rag.config import Settings
 from rag.generation.multi_query import AllIndexesUnavailable, run_multi_query
 
+
 class FakeRetriever:
     def __init__(self, chunks_by_index):
         self.chunks_by_index = chunks_by_index
