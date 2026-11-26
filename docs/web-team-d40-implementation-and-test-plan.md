@@ -77,7 +77,7 @@ Removing a repository from scope or deleting it later must not rewrite old messa
 
 ### RAG audit update (2026-11-26)
 
-The RAG-only audit fixes are now present on `work/wp6-retrieval-reranking` at commit `69e6fb358876a100eda5712347ead79e5b1e897a`:
+The RAG-only audit fixes are now present on `work/wp6-retrieval-reranking` at commit `e633927999fd18a0f6f568acfa1a58eb3b70440a`:
 
 - Repaired the malformed `MultiQueryScopeItem` and `MultiCitation` OpenAPI schema fragments and added an OpenAPI validator to CI.
 - Added bounded admission for orchestration and retrieval workers. A timed-out running worker retains its capacity slot until it actually exits, preventing unbounded queued work and silent worker-pool exhaustion.
@@ -91,7 +91,7 @@ Validation on commit `69e6fb3`:
 - Ruff lint and format: passed.
 - Pytest: **178 passed**.
 - Dataset validation and pinned Flask ingestion smoke test: passed.
-- CI run: [#227](https://github.com/CALLMEKANEKI/codebase-rag-service/actions/runs/45747217680).
+- CI run: [#231](https://github.com/CALLMEKANEKI/codebase-rag-service/actions/runs/45747457503).
 
 This is not D40 E2E acceptance, Eval Runner execution, Test-set evaluation, retrieval benchmark, merge, or deployment. Those remain outside this validation run and require their own approval.
 
