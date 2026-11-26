@@ -18,7 +18,6 @@ from rag.retrieval.hybrid import HybridRetriever
 from rag.retrieval.reranker import CrossEncoderReranker, RerankingRetriever
 
 
-
 logger = logging.getLogger(__name__)
 
 _EVIDENCE_SUFFICIENCY_MIN_CHUNKS = 2
