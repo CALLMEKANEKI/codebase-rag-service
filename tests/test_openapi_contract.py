@@ -13,6 +13,7 @@ EXPECTED_OPERATIONS = {
     ("DELETE", "/v1/indexes/{id}"),
     ("GET", "/v1/indexes/{id}/files"),
     ("POST", "/v1/query"),
+    ("POST", "/v1/query/multi"),
 }
 EXPECTED_CITATION_FIELDS = {
     "ref_id",
@@ -74,6 +75,19 @@ def test_citation_schema_requires_all_expected_fields(openapi_spec):
     required = set(openapi_spec["components"]["schemas"]["Citation"]["required"])
 
     assert EXPECTED_CITATION_FIELDS <= required
+
+
+def test_multi_citation_schema_requires_repository_provenance(openapi_spec):
+    required = set(openapi_spec["components"]["schemas"]["MultiCitation"]["required"])
+
+    assert {
+        "repository_id",
+        "index_id",
+        "commit_sha",
+        "file_path",
+        "start_line",
+        "end_line",
+    } <= required
 
 
 def test_error_response_requires_details(openapi_spec):

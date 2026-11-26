@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Codebase RAG Service API
-  version: 0.2.0-draft
-  summary: Contract Web <-> RAG (Draft v0.2)
+  version: 0.3.0
+  summary: Approved multi-index contract Web <-> RAG (v0.3)
   description: |
     Nguon su that cua Contract Web <-> RAG. Trang "03 - Quy uoc & kien truc chung" tren Notion
     mo ta cac quyet dinh; neu file nay lech voi Notion thi sua file cho khop (hoac cap nhat Notion
@@ -15,7 +15,7 @@ info:
     - Loi phat sinh sau khi job index da duoc nhan (repo qua lon, clone loi...) KHONG tra HTTP loi dong bo;
       chung duoc phan anh qua `status = failed` va `error.code` o `GET /v1/indexes/{id}`.
     - Frontend khong goi RAG truc tiep; chi Web Backend goi RAG (giu `X-API-Key`).
-    - MVP: single-turn (khong co history), baseline retrieval la `dense`, khong rerank.
+    - `POST /v1/query` giu nguyen de backward compatibility; `POST /v1/query/multi` la multi-index path.
 servers:
   - url: http://localhost:8000
     description: Local development
@@ -279,6 +279,147 @@ paths:
           $ref: '#/components/responses/IndexNotReady'
         '500':
           $ref: '#/components/responses/InternalError'
+  /v1/query/multi:
+    post:
+      operationId: queryMultipleIndexes
+      tags: [Query]
+      summary: Dat cau hoi tren nhieu index trong Conversation Scope
+      description: |
+        Web Backend gui danh sach index da duoc xac thuc va cho phep trong Conversation Scope.
+        RAG truy van Focus truoc; neu evidence chua du, co the fallback sang cac repository khac
+        trong Scope. RAG fusion evidence, deduplicate va chi tao mot cau tra loi cuoi cung.
+        Khong duoc truy van index ngoai Scope. Focus rong nghia la truy van toan bo Scope.
+        MVP sufficiency heuristic: Focus duoc coi la du khi co it nhat hai non-empty chunks
+        tren cac repository Focus da truy van. Day la proxy dinh luong, khong phai danh gia
+        ngu nghia rang buoc cau hoi voi evidence.
+        Moi request co mot absolute deadline toi da 60 giay, bao gom retrieval, fallback,
+        fusion, generation va tat ca model fallback attempts. Khong tu dong retry POST.
+        Endpoint nay chi duoc goi boi Web Backend; index_id la trusted server-to-server data.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MultiQueryRequest'
+            example:
+              question: Trace how an order response is produced and consumed.
+              scope:
+                - repository_id: web-repository-guid-a
+                  index_id: idx_backend_a
+                  display_name: orders-api
+                - repository_id: web-repository-guid-b
+                  index_id: idx_client_b
+                  display_name: orders-client
+              focus_repository_ids: [web-repository-guid-a]
+              top_k: 8
+              options:
+                mode: hybrid
+                rerank: false
+              debug: false
+      responses:
+        '200':
+          description: Ket qua truy van da fusion, co the completed hoac partial/no_evidence.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultiQueryResponse'
+              example:
+                execution_status: partial
+                answer_status: answered
+                answer: "API defines the field [1]; client consumes it in the order summary [2]."
+                focus:
+                  requested_repository_ids: [web-repository-guid-a]
+                  searched_focus_repository_ids: [web-repository-guid-a]
+                  fallback_repository_ids: [web-repository-guid-b]
+                  fallback_triggered: true
+                  fallback_reason: focused_evidence_insufficient
+                repository_outcomes:
+                  - repository_id: web-repository-guid-a
+                    index_id: idx_backend_a
+                    commit_sha: abc123
+                    outcome: searched_with_evidence
+                    reason: null
+                    evidence_count: 2
+                    latency_ms: 38
+                  - repository_id: web-repository-guid-b
+                    index_id: idx_client_b
+                    commit_sha: def456
+                    outcome: searched_with_evidence
+                    reason: null
+                    evidence_count: 1
+                    latency_ms: 42
+                citations:
+                  - ref_id: 1
+                    repository_id: web-repository-guid-a
+                    index_id: idx_backend_a
+                    commit_sha: abc123
+                    file_path: app/routes/orders.py
+                    symbol: get_order
+                    symbol_kind: function
+                    start_line: 20
+                    end_line: 42
+                    snippet: "..."
+                    score: 0.91
+                usage: null
+                latency_ms: 920
+                debug: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/InvalidRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          description: Loi tu LLM provider trong giai doan generation.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: LLM_ERROR
+                  message: The language model request failed
+                  details: {}
+        '503':
+          description: Khong co index nao trong Scope co the truy van.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: ALL_INDEXES_UNAVAILABLE
+                  message: No supplied index is available for querying
+                  details:
+                    repository_outcomes:
+                      - repository_id: web-repository-guid-a
+                        outcome: unavailable
+                        reason: index_not_ready
+        '504':
+          description: Vuot absolute deadline 60 giay cua toan bo multi-index request.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: TIMEOUT
+                  message: The request timed out
+                  details: {}
   /v1/query:
     post:
       operationId: queryIndex
@@ -289,7 +430,7 @@ paths:
         `[n]` trong `answer` tuong ung `citations[].ref_id`.
         Baseline MVP chi ho tro `options.mode = dense` va `rerank = false`; gia tri chua ho tro
         tra `422 INVALID_REQUEST`.
-        Timeout phia Web Backend: 45s; `/v1/query` KHONG tu dong retry khi timeout.
+        Legacy single-index timeout/retry behavior remains unchanged. Multi-index timeout is governed by its own 60-second absolute deadline; query POST is not automatically retried.
       parameters:
         - $ref: '#/components/parameters/RequestId'
       requestBody:
@@ -493,6 +634,7 @@ components:
         - REPO_TOO_LARGE
         - INVALID_REPO
         - INVALID_REQUEST
+        - ALL_INDEXES_UNAVAILABLE
         - INDEX_NOT_READY
         - INDEX_NOT_FOUND
         - FILE_NOT_FOUND
@@ -735,6 +877,261 @@ components:
         debug:
           oneOf:
             - $ref: '#/components/schemas/DebugInfo'
+            - type: 'null'
+    MultiQueryOptions:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [dense, bm25, hybrid]
+          default: hybrid
+          description: Retrieval mode for each index before evidence fusion.
+        rerank:
+          type: boolean
+          default: false
+          description: Reranking is opt-in; disabled by default.
+    MultiQueryScopeItem:
+      type: object
+      required: [repository_id, index_id, display_name]
+      properties:
+        repository_id:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Stable Web Repository ID; not an authorization key by itself.
+        index_id:
+          type: string
+          pattern: '^idx_[A-Za-z0-9_-]+$'
+          description: Trusted RAG index ID resolved server-side by Web Backend; never browser supplied.
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 300
+          description: Normalized owner/repo display label.
+    MultiQueryRequest:
+      type: object
+      required: [question, scope]
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        scope:
+          type: array
+          minItems: 1
+          maxItems: 5
+          description: |
+            Authorized conversation Scope. Repository IDs and index IDs must each be unique.
+            RAG rejects a request above the configured cap; it never silently truncates.
+          items:
+            $ref: '#/components/schemas/MultiQueryScopeItem'
+        focus_repository_ids:
+          type: array
+          uniqueItems: true
+          description: |
+            Optional soft preference. Every ID must be present in scope. Empty or omitted
+            means search all Scope repositories without a preferred subset.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 8
+          description: Global final evidence chunk limit after fusion, not a per-index answer limit.
+        options:
+          $ref: '#/components/schemas/MultiQueryOptions'
+        debug:
+          type: boolean
+          default: false
+    MultiRepositoryOutcome:
+      type: object
+      required: [repository_id, index_id, outcome, reason, evidence_count, latency_ms]
+      properties:
+        repository_id:
+          type: string
+        index_id:
+          type: string
+        commit_sha:
+          type: [string, 'null']
+        outcome:
+          type: string
+          enum: [searched_with_evidence, searched_no_evidence, unavailable, failed, not_searched]
+        reason:
+          type: [string, 'null']
+          enum:
+            - focus_evidence_sufficient
+            - index_not_found
+            - index_not_ready
+            - storage_error
+            - timeout
+            - retrieval_error
+            - retrieval_capacity
+            - null
+        evidence_count:
+          type: integer
+          minimum: 0
+        latency_ms:
+          type: [integer, 'null']
+          minimum: 0
+    MultiQueryFocus:
+      type: object
+      required:
+        - requested_repository_ids
+        - searched_focus_repository_ids
+        - fallback_repository_ids
+        - fallback_triggered
+        - fallback_reason
+      properties:
+        requested_repository_ids:
+          type: array
+          items:
+            type: string
+        searched_focus_repository_ids:
+          type: array
+          items:
+            type: string
+        fallback_repository_ids:
+          type: array
+          items:
+            type: string
+        fallback_triggered:
+          type: boolean
+        fallback_reason:
+          type: [string, 'null']
+          enum: [focused_evidence_insufficient, focused_sources_unavailable, null]
+    MultiCitation:
+      type: object
+      required:
+        - ref_id
+        - repository_id
+        - index_id
+        - commit_sha
+        - file_path
+        - symbol
+        - symbol_kind
+        - start_line
+        - end_line
+        - snippet
+        - score
+      properties:
+        ref_id:
+          type: integer
+          minimum: 1
+          description: Matches [n] citation markers in answer.
+        repository_id:
+          type: string
+        index_id:
+          type: string
+          pattern: '^idx_[A-Za-z0-9_-]+$'
+        commit_sha:
+          type: [string, 'null']
+        file_path:
+          type: string
+        symbol:
+          type: [string, 'null']
+        symbol_kind:
+          type: [string, 'null']
+        start_line:
+          type: integer
+          minimum: 1
+        end_line:
+          type: integer
+          minimum: 1
+        snippet:
+          type: string
+        score:
+          type: number
+    MultiQueryDebug:
+      type: object
+      required: [candidate_count, fused_chunk_count, context_source_count, selected_evidence]
+      properties:
+        candidate_count:
+          type: integer
+          minimum: 0
+          description: Total non-empty candidates returned by all searched repositories before fusion.
+        fused_chunk_count:
+          type: integer
+          minimum: 0
+          description: Number of candidates retained after cross-repository fusion and top_k.
+        context_source_count:
+          type: integer
+          minimum: 0
+          description: Number of evidence chunks actually included in the final model context.
+        selected_evidence:
+          type: array
+          items:
+            type: object
+            required: [ref_id, repository_id, index_id, file_path, start_line, end_line]
+            properties:
+              ref_id:
+                type: integer
+                minimum: 1
+              repository_id:
+                type: string
+              index_id:
+                type: string
+              commit_sha:
+                type: [string, 'null']
+              chunk_id:
+                type: [string, 'null']
+              file_path:
+                type: string
+              start_line:
+                type: integer
+                minimum: 1
+              end_line:
+                type: integer
+                minimum: 1
+              fused_rank:
+                type: [integer, 'null']
+                description: Position after global cross-repository fusion.
+              score:
+                type: [number, 'null']
+                description: Reciprocal-rank fusion score.
+    MultiQueryResponse:
+      type: object
+      required:
+        - execution_status
+        - answer_status
+        - answer
+        - focus
+        - repository_outcomes
+        - citations
+        - latency_ms
+        - debug
+      properties:
+        execution_status:
+          type: string
+          enum: [completed, partial]
+        answer_status:
+          type: string
+          enum: [answered, no_evidence]
+        answer:
+          type: string
+        focus:
+          $ref: '#/components/schemas/MultiQueryFocus'
+        repository_outcomes:
+          type: array
+          description: Exactly one outcome for each repository supplied in request scope.
+          items:
+            $ref: '#/components/schemas/MultiRepositoryOutcome'
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/MultiCitation'
+        usage:
+          oneOf:
+            - $ref: '#/components/schemas/Usage'
+            - type: 'null'
+        latency_ms:
+          type: integer
+          minimum: 0
+        debug:
+          oneOf:
+            - $ref: '#/components/schemas/MultiQueryDebug'
             - type: 'null'
     FileContent:
       type: object

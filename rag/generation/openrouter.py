@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 import httpx
 
@@ -29,8 +30,9 @@ class OpenRouterLanguageModel:
         if not models:
             raise ValueError("At least one OpenRouter model is required")
         self.models = models
+        self.timeout_seconds = timeout_ms / 1000
         self._client = httpx.Client(
-            timeout=httpx.Timeout(timeout_ms / 1000),
+            timeout=httpx.Timeout(self.timeout_seconds),
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
@@ -40,6 +42,19 @@ class OpenRouterLanguageModel:
         )
 
     def generate(self, *, question: str, context: str) -> GenerationResult:
+        return self.generate_with_timeout(
+            question=question,
+            context=context,
+            timeout_seconds=self.timeout_seconds,
+        )
+
+    def generate_with_timeout(
+        self,
+        *,
+        question: str,
+        context: str,
+        timeout_seconds: float,
+    ) -> GenerationResult:
         messages = [
             {"role": "system", "content": SYSTEM_INSTRUCTION},
             {
@@ -54,9 +69,15 @@ class OpenRouterLanguageModel:
                 ),
             },
         ]
+        deadline = time.monotonic() + max(
+            0.05, min(timeout_seconds, self.timeout_seconds)
+        )
         last_error: Exception | None = None
 
         for position, model in enumerate(self.models, start=1):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
             try:
                 response = self._client.post(
                     self.endpoint,
@@ -67,6 +88,7 @@ class OpenRouterLanguageModel:
                         "max_tokens": 1200,
                         "stream": False,
                     },
+                    timeout=httpx.Timeout(remaining),
                 )
                 response.raise_for_status()
                 payload = response.json()
@@ -110,6 +132,8 @@ class OpenRouterLanguageModel:
 
         if isinstance(last_error, (TimeoutError, httpx.TimeoutException)):
             raise last_error
+        if time.monotonic() >= deadline:
+            raise TimeoutError("OpenRouter total generation timeout elapsed")
         raise LLMError("All configured OpenRouter models failed") from last_error
 
     def close(self) -> None:

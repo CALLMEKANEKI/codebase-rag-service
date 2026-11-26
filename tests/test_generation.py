@@ -69,9 +69,54 @@ def test_citation_validator_discards_unknown_refs_and_builds_contract_shape():
 
 def test_uncited_or_only_invalid_answer_fails_closed():
     source = build_context([RetrievedChunk(chunk(), 0.9, 1)]).sources
-    answer, citations = validate_citations("Unsupported answer [42].", source)
+    answer, citations = validate_citations(
+        "Unsupported answer [42].", source, question="Explain Session.request"
+    )
 
     assert "not find enough evidence" in answer
+    assert citations == []
+
+
+def test_refusal_never_returns_retrieved_citations_even_if_model_adds_markers():
+    sources = build_context(
+        [RetrievedChunk(chunk(f"c{i}"), 0.9 - i / 100, i) for i in range(1, 9)]
+    ).sources
+
+    answer, citations = validate_citations(
+        "I can only answer questions about the indexed repository. [1] [2] [3]",
+        sources,
+        question="Write me a short poem about the sea.",
+    )
+
+    assert answer == (
+        "I could not find enough evidence in the indexed repository to answer that question."
+    )
+    assert citations == []
+
+
+def test_vietnamese_refusal_is_normalized_to_vietnamese_without_citations():
+    sources = build_context([RetrievedChunk(chunk(), 0.9, 1)]).sources
+
+    answer, citations = validate_citations(
+        "I cannot answer this question based on the excerpts. [1]",
+        sources,
+        question="Hôm nay thời tiết Hà Nội thế nào?",
+    )
+
+    assert answer.startswith("Tôi không tìm thấy đủ bằng chứng")
+    assert citations == []
+
+
+def test_vietnamese_no_evidence_response_when_model_omits_markers():
+    sources = build_context([RetrievedChunk(chunk(), 0.9, 1)]).sources
+
+    answer, citations = validate_citations(
+        "I do not have enough information to answer.",
+        sources,
+        question="Session.request hoạt động như thế nào?",
+    )
+
+    assert answer.startswith("Tôi không tìm thấy đủ bằng chứng")
     assert citations == []
 
 
@@ -103,3 +148,28 @@ def test_context_never_partially_truncates_citable_chunks():
 
     assert context.text == ""
     assert context.sources == ()
+
+
+def test_context_header_can_be_disabled_without_losing_citation_markers():
+    item = chunk()
+    item["doc_first_line"] = "Dispatches an incoming request."
+    context = build_context(
+        [RetrievedChunk(item, 0.9, 1)],
+        include_header=False,
+    )
+
+    assert context.text.startswith("[1]\ndef dispatch_request")
+    assert "src/app.py" not in context.text
+    assert "dispatch_request (" not in context.text
+    assert context.sources[0].ref_id == 1
+
+
+def test_context_reports_sources_truncated_by_character_budget():
+    results = [
+        RetrievedChunk(chunk("c1", "x" * 100), 0.9, 1),
+        RetrievedChunk(chunk("c2", "y" * 100), 0.8, 2),
+    ]
+    context = build_context(results, max_chars=80, include_header=False)
+
+    assert context.sources == ()
+    assert context.truncated_sources == 2

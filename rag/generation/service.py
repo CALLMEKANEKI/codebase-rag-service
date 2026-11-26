@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from rag.generation.base import LanguageModel
-from rag.generation.citations import validate_citations
+from rag.generation.citations import no_evidence_answer, validate_citations
 from rag.generation.context import build_context
-from rag.retrieval.dense import DenseRetriever
 
 
 @dataclass(frozen=True)
@@ -18,9 +17,7 @@ class QueryResult:
 
 
 class QueryService:
-    def __init__(
-        self, retriever: DenseRetriever, language_model: LanguageModel
-    ) -> None:
+    def __init__(self, retriever: Any, language_model: LanguageModel) -> None:
         self.retriever = retriever
         self.language_model = language_model
 
@@ -36,17 +33,26 @@ class QueryService:
         context = build_context(retrieved)
         if not context.sources:
             return QueryResult(
-                answer="I could not find enough evidence in the indexed repository to answer that question.",
+                answer=no_evidence_answer(question),
                 citations=[],
                 usage=None,
-                debug={"mode": "dense", "retrieved": []} if debug else None,
+                debug={
+                    "mode": getattr(self.retriever, "mode", "dense"),
+                    "retrieved": [],
+                }
+                if debug
+                else None,
             )
 
         generated = self.language_model.generate(
             question=question,
             context=context.text,
         )
-        answer, citations = validate_citations(generated.text, context.sources)
+        answer, citations = validate_citations(
+            generated.text,
+            context.sources,
+            question=question,
+        )
         usage = None
         if generated.input_tokens is not None or generated.output_tokens is not None:
             usage = {
@@ -57,7 +63,7 @@ class QueryService:
         if debug:
             included_chunk_ids = {id(source.chunk) for source in context.sources}
             debug_info = {
-                "mode": "dense",
+                "mode": getattr(self.retriever, "mode", "dense"),
                 "retrieved": [
                     {
                         "chunk_id": str(item.chunk.get("chunk_id") or ""),

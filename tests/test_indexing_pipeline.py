@@ -2,6 +2,7 @@ import threading
 from pathlib import Path
 
 from rag.indexing_pipeline import IndexCancelled, run_indexing
+from rag.retrieval.bm25 import BM25Retriever
 
 
 class FakeEmbedder:
@@ -65,6 +66,9 @@ def test_indexing_pipeline_creates_snapshot_chunks_and_vectors(tmp_path, monkeyp
     assert len(store.points) == 1
     assert statuses[-1]["status"] == "ready"
     assert statuses[-1]["commit_sha"] == commit_sha
+    lexical_results = BM25Retriever(index_root.parent).retrieve("idx_test", "greet")
+    assert lexical_results
+    assert lexical_results[0].chunk["index_id"] == "idx_test"
 
 
 def test_indexing_pipeline_stops_when_cancelled_after_clone(tmp_path, monkeypatch):
