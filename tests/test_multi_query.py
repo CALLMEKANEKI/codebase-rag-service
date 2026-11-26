@@ -339,3 +339,48 @@ def test_timed_out_focus_source_does_not_block_in_scope_fallback(tmp_path, monke
     assert result["focus"]["fallback_triggered"] is True
     assert result["focus"]["fallback_repository_ids"] == ["repo-b"]
     assert model.calls == 1
+
+def test_timed_out_focus_preflight_does_not_block_in_scope_fallback(
+    tmp_path, monkeypatch
+):
+    import time
+    from rag.generation import multi_query
+
+    class SlowFocusVectorStore:
+        def collection_exists(self, index_id):
+            if index_id == "idx_a":
+                time.sleep(0.08)
+            return True
+
+    monkeypatch.setattr(multi_query, "_PER_INDEX_TIMEOUT_SECONDS", 0.01)
+    rows = {
+        "idx_a": {"status": "ready", "commit_sha": "a" * 40},
+        "idx_b": {"status": "ready", "commit_sha": "b" * 40},
+    }
+    root, service, model, registry = setup(tmp_path, {}, rows)
+    service.retriever = FakeRetriever(
+        {"idx_b": [make_result(make_chunk("b1", "fallback evidence"))]}
+    )
+    model.text = "Fallback evidence found [1]."
+
+    result = run_multi_query(
+        question="Explain this code",
+        scope=[
+            {"repository_id": "repo-a", "index_id": "idx_a", "display_name": "A"},
+            {"repository_id": "repo-b", "index_id": "idx_b", "display_name": "B"},
+        ],
+        focus_repository_ids=["repo-a"],
+        top_k=4,
+        mode="dense",
+        rerank=False,
+        query_service=service,
+        registry=registry,
+        index_storage_path=root,
+        vector_store=SlowFocusVectorStore(),
+    )
+
+    assert result["repository_outcomes"][0]["outcome"] == "failed"
+    assert result["repository_outcomes"][0]["reason"] == "timeout"
+    assert result["repository_outcomes"][1]["outcome"] == "searched_with_evidence"
+    assert result["focus"]["fallback_triggered"] is True
+    assert model.calls == 1
