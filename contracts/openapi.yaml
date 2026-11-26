@@ -1085,10 +1085,12 @@ components:
               end_line:
                 type: integer
                 minimum: 1
-              rank:
+              fused_rank:
                 type: [integer, 'null']
+                description: Position after global cross-repository fusion.
               score:
                 type: [number, 'null']
+                description: Reciprocal-rank fusion score.
     MultiQueryResponse:
       type: object
       required:
