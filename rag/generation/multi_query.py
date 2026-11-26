@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from concurrent.futures import TimeoutError as FutureTimeoutError
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from pathlib import Path
 from typing import Any
 
@@ -34,10 +34,15 @@ _ORCHESTRATION_EXECUTOR = ThreadPoolExecutor(
 # Keep timed-out running retrievals from allowing an unbounded queue to build up.
 # A slot is released only when the underlying worker actually finishes.
 _RETRIEVAL_CAPACITY = threading.BoundedSemaphore(_MAX_SCOPE)
+_ORCHESTRATION_CAPACITY = threading.BoundedSemaphore(_MAX_SCOPE)
 
 
 def _release_retrieval_capacity(_future: Any) -> None:
     _RETRIEVAL_CAPACITY.release()
+
+
+def _release_orchestration_capacity(_future: Any) -> None:
+    _ORCHESTRATION_CAPACITY.release()
 
 
 def _non_empty_results(results: list[RetrievedChunk]) -> list[RetrievedChunk]:
@@ -336,12 +341,29 @@ def run_multi_query(
     def search_batch(repositories: list[dict[str, str]], *, is_fallback: bool) -> None:
         if not repositories:
             return
-        futures = {
-            _ORCHESTRATION_EXECUTOR.submit(
-                search_repository, repository, is_fallback=is_fallback
-            ): repository
-            for repository in repositories
-        }
+        futures = {}
+        for repository in repositories:
+            if not _ORCHESTRATION_CAPACITY.acquire(blocking=False):
+                outcomes[repository["repository_id"]] = {
+                    "repository_id": repository["repository_id"],
+                    "index_id": repository["index_id"],
+                    "commit_sha": None,
+                    "outcome": "failed",
+                    "reason": "retrieval_capacity",
+                    "evidence_count": 0,
+                    "latency_ms": None,
+                }
+                continue
+            try:
+                future = _ORCHESTRATION_EXECUTOR.submit(
+                    search_repository, repository, is_fallback=is_fallback
+                )
+            except BaseException:
+                _ORCHESTRATION_CAPACITY.release()
+                raise
+            future.add_done_callback(_release_orchestration_capacity)
+            futures[future] = repository
+
         for future, repository in futures.items():
             repository_id = repository["repository_id"]
             remaining_seconds = deadline - time.monotonic()
@@ -359,7 +381,9 @@ def run_multi_query(
                 existing.update(outcome="failed", reason="timeout", latency_ms=None)
                 continue
             try:
-                future.result(timeout=remaining_seconds)
+                future.result(
+                    timeout=min(_PER_INDEX_TIMEOUT_SECONDS, remaining_seconds)
+                )
             except FutureTimeoutError:
                 future.cancel()
                 existing = outcomes.get(repository_id)
