@@ -670,7 +670,7 @@ def run_multi_query(
                     "file_path": chunk.get("file_path"),
                     "start_line": chunk.get("start_line"),
                     "end_line": chunk.get("end_line"),
-                    "rank": fused_item.rank if fused_item else None,
+                    "fused_rank": fused_item.rank if fused_item else None,
                     "score": fused_item.score if fused_item else None,
                 }
             )
