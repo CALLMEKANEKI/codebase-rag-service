@@ -1040,6 +1040,51 @@ components:
           type: string
         score:
           type: number
+    MultiQueryDebug:
+      type: object
+      required: [candidate_count, fused_chunk_count, context_source_count, selected_evidence]
+      properties:
+        candidate_count:
+          type: integer
+          minimum: 0
+          description: Total non-empty candidates returned by all searched repositories before fusion.
+        fused_chunk_count:
+          type: integer
+          minimum: 0
+          description: Number of candidates retained after cross-repository fusion and top_k.
+        context_source_count:
+          type: integer
+          minimum: 0
+          description: Number of evidence chunks actually included in the final model context.
+        selected_evidence:
+          type: array
+          items:
+            type: object
+            required: [ref_id, repository_id, index_id, file_path, start_line, end_line]
+            properties:
+              ref_id:
+                type: integer
+                minimum: 1
+              repository_id:
+                type: string
+              index_id:
+                type: string
+              commit_sha:
+                type: [string, 'null']
+              chunk_id:
+                type: [string, 'null']
+              file_path:
+                type: string
+              start_line:
+                type: integer
+                minimum: 1
+              end_line:
+                type: integer
+                minimum: 1
+              rank:
+                type: [integer, 'null']
+              score:
+                type: [number, 'null']
     MultiQueryResponse:
       type: object
       required:
@@ -1077,6 +1122,10 @@ components:
         latency_ms:
           type: integer
           minimum: 0
+        debug:
+          oneOf:
+            - $ref: '#/components/schemas/MultiQueryDebug'
+            - type: 'null'
     FileContent:
       type: object
       required: [path, start, end, content, language]
