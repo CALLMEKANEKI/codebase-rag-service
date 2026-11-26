@@ -86,7 +86,7 @@ The RAG-only audit fixes are now present on `work/wp6-retrieval-reranking` at co
 - Added opt-in `debug` diagnostics: candidate count, fused count, final context-source count, and provenance/rank/score for chunks included in the final model context.
 - Expanded tests for concurrent retrieval, focused retrieval timeout and fallback, preflight timeout and fallback, empty-evidence semantics, diagnostics, and multi-index OpenAPI provenance.
 
-Validation on commit `69e6fb3`:
+Validation on commit `e633927`:
 - OpenAPI validation: passed.
 - Ruff lint and format: passed.
 - Pytest: **178 passed**.
