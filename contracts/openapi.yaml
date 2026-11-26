@@ -964,6 +964,7 @@ components:
             - storage_error
             - timeout
             - retrieval_error
+            - retrieval_capacity
             - null
         evidence_count:
           type: integer
