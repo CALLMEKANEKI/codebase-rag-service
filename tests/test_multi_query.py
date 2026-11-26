@@ -160,9 +160,7 @@ def test_empty_retrieval_is_reported_as_no_evidence_not_failure(tmp_path):
 
     result = run_multi_query(
         question="Explain this code",
-        scope=[
-            {"repository_id": "repo-a", "index_id": "idx_a", "display_name": "A"}
-        ],
+        scope=[{"repository_id": "repo-a", "index_id": "idx_a", "display_name": "A"}],
         focus_repository_ids=[],
         top_k=4,
         mode="dense",
@@ -190,9 +188,7 @@ def test_multi_query_debug_returns_selected_context_provenance(tmp_path):
 
     result = run_multi_query(
         question="Explain this code",
-        scope=[
-            {"repository_id": "repo-a", "index_id": "idx_a", "display_name": "A"}
-        ],
+        scope=[{"repository_id": "repo-a", "index_id": "idx_a", "display_name": "A"}],
         focus_repository_ids=[],
         top_k=4,
         mode="dense",
