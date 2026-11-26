@@ -897,22 +897,7 @@ components:
           description: Stable Web Repository ID; not an authorization key by itself.
         index_id:
           type: string
-          pattern: '^idx_[A-Za-z0-9_-]+      type: object
-      required: [path, start, end, content, language]
-      properties:
-        path:
-          type: string
-        start:
-          type: integer
-          minimum: 1
-        end:
-          type: integer
-          minimum: 1
-        content:
-          type: string
-        language:
-          type: [string, 'null']
-          description: "Vi du: python. `null` neu khong nhan dien duoc."
+          pattern: '^idx_[A-Za-z0-9_-]+$'
           description: Trusted RAG index ID resolved server-side by Web Backend; never browser supplied.
         display_name:
           type: string
@@ -1035,22 +1020,7 @@ components:
           type: string
         index_id:
           type: string
-          pattern: '^idx_[A-Za-z0-9_-]+      type: object
-      required: [path, start, end, content, language]
-      properties:
-        path:
-          type: string
-        start:
-          type: integer
-          minimum: 1
-        end:
-          type: integer
-          minimum: 1
-        content:
-          type: string
-        language:
-          type: [string, 'null']
-          description: "Vi du: python. `null` neu khong nhan dien duoc."
+          pattern: '^idx_[A-Za-z0-9_-]+$'
         commit_sha:
           type: [string, 'null']
         file_path:
