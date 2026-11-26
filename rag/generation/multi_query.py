@@ -78,7 +78,7 @@ def _fuse_by_repository(
     *,
     top_k: int,
 ) -> list[RetrievedChunk]:
-    """Fuse rank scores globally while reserving an initial slot per repository."""
+    """Apply reciprocal-rank scoring and reserve one top candidate per repository."""
     fused_by_key: dict[tuple[str, str], dict[str, Any]] = {}
     per_repository: list[list[dict[str, Any]]] = []
 
@@ -257,6 +257,12 @@ def run_multi_query(
                         0, int((time.monotonic() - source_started) * 1000)
                     )
                     return
+            except (TimeoutError, httpx.TimeoutException):
+                outcome.update(outcome="failed", reason="timeout")
+                outcome["latency_ms"] = max(
+                    0, int((time.monotonic() - source_started) * 1000)
+                )
+                return
             except Exception as exc:
                 logger.warning(
                     "Vector-store availability check failed for %s",
