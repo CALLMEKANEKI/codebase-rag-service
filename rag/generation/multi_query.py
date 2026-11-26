@@ -147,6 +147,7 @@ def run_multi_query(
     index_storage_path: str | Path,
     vector_store: Any = None,
     timeout_seconds: float = 60.0,
+    debug: bool = False,
 ) -> dict[str, Any]:
     """Retrieve within the authorized Scope, expand soft Focus, and generate once."""
     started = time.monotonic()
@@ -635,6 +636,47 @@ def run_multi_query(
                 commit_sha=chunk.get("commit_sha"),
             )
 
+    debug_info = None
+    if debug:
+        fused_by_key = {
+            (
+                str(item.chunk.get("index_id") or ""),
+                str(item.chunk.get("chunk_id") or ""),
+            ): item
+            for item in fused
+        }
+        selected_evidence = []
+        for source in context.sources:
+            chunk = source.chunk
+            fused_item = fused_by_key.get(
+                (
+                    str(chunk.get("index_id") or ""),
+                    str(chunk.get("chunk_id") or ""),
+                )
+            )
+            selected_evidence.append(
+                {
+                    "ref_id": source.ref_id,
+                    "repository_id": chunk.get("repository_id"),
+                    "index_id": chunk.get("index_id"),
+                    "commit_sha": chunk.get("commit_sha"),
+                    "chunk_id": chunk.get("chunk_id"),
+                    "file_path": chunk.get("file_path"),
+                    "start_line": chunk.get("start_line"),
+                    "end_line": chunk.get("end_line"),
+                    "rank": fused_item.rank if fused_item else None,
+                    "score": fused_item.score if fused_item else None,
+                }
+            )
+        debug_info = {
+            "candidate_count": sum(
+                item["evidence_count"] for item in repository_outcomes
+            ),
+            "fused_chunk_count": len(fused),
+            "context_source_count": len(context.sources),
+            "selected_evidence": selected_evidence,
+        }
+
     execution_status = (
         "partial"
         if any(
@@ -668,6 +710,7 @@ def run_multi_query(
         "repository_outcomes": repository_outcomes,
         "citations": citations,
         "usage": usage,
+        "debug": debug_info,
         "latency_ms": max(0, int((time.monotonic() - started) * 1000)),
     }
 
