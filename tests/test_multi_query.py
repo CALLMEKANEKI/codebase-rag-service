@@ -165,7 +165,7 @@ def test_multi_query_rejects_focus_outside_scope(tmp_path):
 
 
 def test_multi_query_reports_all_sources_unavailable(tmp_path):
-    root, service, model, registry = setup(tmp_path, {}, {})
+    root, service, _model, registry = setup(tmp_path, {}, {})
     try:
         run_multi_query(
             question="Explain this code",
