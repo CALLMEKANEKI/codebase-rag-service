@@ -200,6 +200,9 @@ def run_multi_query(
         repository_id = repository["repository_id"]
         index_id = repository["index_id"]
         source_started = time.monotonic()
+        source_deadline = min(
+            deadline, source_started + _PER_INDEX_TIMEOUT_SECONDS
+        )
         outcome = {
             "repository_id": repository_id,
             "index_id": index_id,
@@ -212,6 +215,12 @@ def run_multi_query(
         outcomes[repository_id] = outcome
 
         row = registry.get(index_id)
+        if time.monotonic() >= source_deadline:
+            outcome.update(outcome="failed", reason="timeout")
+            outcome["latency_ms"] = max(
+                0, int((time.monotonic() - source_started) * 1000)
+            )
+            return
         if row is None:
             outcome.update(outcome="unavailable", reason="index_not_found")
             outcome["latency_ms"] = max(
@@ -241,7 +250,14 @@ def run_multi_query(
             return
         if vector_store is not None and mode in {"dense", "hybrid"}:
             try:
-                if not vector_store.collection_exists(index_id):
+                collection_exists = vector_store.collection_exists(index_id)
+                if time.monotonic() >= source_deadline:
+                    outcome.update(outcome="failed", reason="timeout")
+                    outcome["latency_ms"] = max(
+                        0, int((time.monotonic() - source_started) * 1000)
+                    )
+                    return
+                if not collection_exists:
                     outcome.update(outcome="unavailable", reason="index_not_ready")
                     outcome["latency_ms"] = max(
                 0, int((time.monotonic() - source_started) * 1000)
@@ -256,12 +272,12 @@ def run_multi_query(
                 return
 
         try:
-            remaining_seconds = deadline - time.monotonic()
+            remaining_seconds = source_deadline - time.monotonic()
             if remaining_seconds <= 0:
-                raise TimeoutError("Multi-index request deadline elapsed")
+                raise TimeoutError("Per-index request deadline elapsed")
             # Bound each source independently so a slow Focus index does not
             # consume the entire request budget and prevent in-Scope fallback.
-            source_timeout = min(_PER_INDEX_TIMEOUT_SECONDS, remaining_seconds)
+            source_timeout = min(remaining_seconds, deadline - time.monotonic())
             if not _RETRIEVAL_CAPACITY.acquire(blocking=False):
                 outcome.update(outcome="failed", reason="retrieval_capacity")
                 outcome["latency_ms"] = max(
@@ -314,8 +330,12 @@ def run_multi_query(
             )
             return
 
-        if time.monotonic() >= deadline:
-            raise TimeoutError("Multi-index request deadline elapsed")
+        if time.monotonic() >= source_deadline:
+            outcome.update(outcome="failed", reason="timeout")
+            outcome["latency_ms"] = max(
+                0, int((time.monotonic() - source_started) * 1000)
+            )
+            return
         outcome["evidence_count"] = len(candidates)
         outcome["outcome"] = (
             "searched_with_evidence" if candidates else "searched_no_evidence"
