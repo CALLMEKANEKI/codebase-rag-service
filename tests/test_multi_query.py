@@ -105,6 +105,7 @@ def test_multi_query_uses_focused_evidence_without_searching_rest(tmp_path):
         index_storage_path=root,
     )
     assert result["focus"]["fallback_triggered"] is False
+    assert result["debug"] is None
     assert result["repository_outcomes"][1]["outcome"] == "not_searched"
     assert model.calls == 1
 
@@ -149,6 +150,32 @@ def test_multi_query_falls_back_inside_scope_and_keeps_citation_provenance(tmp_p
     )
     assert "fallback source" in result["answer"]
     assert model.calls == 1
+
+
+def test_empty_retrieval_is_reported_as_no_evidence_not_failure(tmp_path):
+    rows = {
+        "idx_a": {"status": "ready", "commit_sha": "a" * 40},
+    }
+    root, service, _model, registry = setup(tmp_path, {}, rows)
+
+    result = run_multi_query(
+        question="Explain this code",
+        scope=[
+            {"repository_id": "repo-a", "index_id": "idx_a", "display_name": "A"}
+        ],
+        focus_repository_ids=[],
+        top_k=4,
+        mode="dense",
+        rerank=False,
+        query_service=service,
+        registry=registry,
+        index_storage_path=root,
+    )
+
+    assert result["repository_outcomes"][0]["outcome"] == "searched_no_evidence"
+    assert result["repository_outcomes"][0]["reason"] is None
+    assert result["answer_status"] == "no_evidence"
+    assert result["execution_status"] == "completed"
 
 
 def test_multi_query_debug_returns_selected_context_provenance(tmp_path):
@@ -379,6 +406,7 @@ def test_timed_out_focus_source_does_not_block_in_scope_fallback(tmp_path, monke
 
     assert result["repository_outcomes"][0]["outcome"] == "failed"
     assert result["repository_outcomes"][0]["reason"] == "timeout"
+    assert result["execution_status"] == "partial"
     assert result["repository_outcomes"][1]["outcome"] == "searched_with_evidence"
     assert result["focus"]["fallback_triggered"] is True
     assert result["focus"]["fallback_repository_ids"] == ["repo-b"]
