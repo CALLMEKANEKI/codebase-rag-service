@@ -600,10 +600,9 @@ def create_app(
         index_ids = [item["index_id"] for item in scope]
         focus_ids = payload.focus_repository_ids
 
-        if (
-            len(set(repository_ids)) != len(repository_ids)
-            or len(set(index_ids)) != len(index_ids)
-        ):
+        if len(set(repository_ids)) != len(repository_ids) or len(
+            set(index_ids)
+        ) != len(index_ids):
             raise APIError(
                 422,
                 "INVALID_REQUEST",
@@ -672,9 +671,7 @@ def create_app(
                 502, "LLM_ERROR", "The language model request failed"
             ) from exc
         except ValueError as exc:
-            raise APIError(
-                422, "INVALID_REQUEST", str(exc)
-            ) from exc
+            raise APIError(422, "INVALID_REQUEST", str(exc)) from exc
 
         # Keep the public latency tied to the complete endpoint execution.
         result["latency_ms"] = max(0, int((time.perf_counter() - started) * 1000))
