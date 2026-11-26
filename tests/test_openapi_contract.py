@@ -78,9 +78,7 @@ def test_citation_schema_requires_all_expected_fields(openapi_spec):
 
 
 def test_multi_citation_schema_requires_repository_provenance(openapi_spec):
-    required = set(
-        openapi_spec["components"]["schemas"]["MultiCitation"]["required"]
-    )
+    required = set(openapi_spec["components"]["schemas"]["MultiCitation"]["required"])
 
     assert {
         "repository_id",
