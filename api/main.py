@@ -656,6 +656,7 @@ def create_app(
                 index_storage_path=request.app.state.settings.index_storage_path,
                 vector_store=vector_store,
                 timeout_seconds=60.0,
+                debug=payload.debug,
             )
         except AllIndexesUnavailable as exc:
             raise APIError(
