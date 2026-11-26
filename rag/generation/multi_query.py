@@ -195,9 +195,7 @@ def run_multi_query(
         repository_id = repository["repository_id"]
         index_id = repository["index_id"]
         source_started = time.monotonic()
-        source_deadline = min(
-            deadline, source_started + _PER_INDEX_TIMEOUT_SECONDS
-        )
+        source_deadline = min(deadline, source_started + _PER_INDEX_TIMEOUT_SECONDS)
         outcome = {
             "repository_id": repository_id,
             "index_id": index_id,
@@ -266,8 +264,8 @@ def run_multi_query(
                 )
                 outcome.update(outcome="unavailable", reason="storage_error")
                 outcome["latency_ms"] = max(
-                0, int((time.monotonic() - source_started) * 1000)
-            )
+                    0, int((time.monotonic() - source_started) * 1000)
+                )
                 return
 
         try:
@@ -322,9 +320,7 @@ def run_multi_query(
             )
             return
         except Exception as exc:
-            logger.warning(
-                "Retrieval failed for index %s", index_id, exc_info=exc
-            )
+            logger.warning("Retrieval failed for index %s", index_id, exc_info=exc)
             outcome.update(outcome="failed", reason="retrieval_error")
             outcome["latency_ms"] = max(
                 0, int((time.monotonic() - source_started) * 1000)
@@ -478,7 +474,8 @@ def run_multi_query(
     # Scope order is preserved in the response regardless of retrieval order.
     repository_outcomes = [outcomes[item["repository_id"]] for item in scope]
     available_count = sum(
-        item["outcome"] in {
+        item["outcome"]
+        in {
             "searched_with_evidence",
             "searched_no_evidence",
         }
