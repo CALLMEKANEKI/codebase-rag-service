@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
+import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +18,8 @@ from rag.retrieval.hybrid import HybridRetriever
 from rag.retrieval.reranker import CrossEncoderReranker, RerankingRetriever
 
 
+logger = logging.getLogger(__name__)
+
 _EVIDENCE_SUFFICIENCY_MIN_CHUNKS = 2
 _PER_INDEX_TIMEOUT_SECONDS = 15.0
 _MAX_SCOPE = 5
@@ -26,6 +31,13 @@ _ORCHESTRATION_EXECUTOR = ThreadPoolExecutor(
     max_workers=_MAX_SCOPE,
     thread_name_prefix="rag-multi-orchestrate",
 )
+# Keep timed-out running retrievals from allowing an unbounded queue to build up.
+# A slot is released only when the underlying worker actually finishes.
+_RETRIEVAL_CAPACITY = threading.BoundedSemaphore(_MAX_SCOPE)
+
+
+def _release_retrieval_capacity(_future: Any) -> None:
+    _RETRIEVAL_CAPACITY.release()
 
 
 def _non_empty_results(results: list[RetrievedChunk]) -> list[RetrievedChunk]:
@@ -231,7 +243,8 @@ def run_multi_query(
                 0, int((time.monotonic() - source_started) * 1000)
             )
                     return
-            except Exception:
+            except Exception as exc:
+                logger.warning("Vector-store availability check failed for %s", index_id, exc_info=exc)
                 outcome.update(outcome="unavailable", reason="storage_error")
                 outcome["latency_ms"] = max(
                 0, int((time.monotonic() - source_started) * 1000)
@@ -245,16 +258,27 @@ def run_multi_query(
             # Bound each source independently so a slow Focus index does not
             # consume the entire request budget and prevent in-Scope fallback.
             source_timeout = min(_PER_INDEX_TIMEOUT_SECONDS, remaining_seconds)
-            retrieval = _RETRIEVAL_EXECUTOR.submit(
-                _retrieve_for_index,
-                index_id=index_id,
-                question=question,
-                top_k=min(20, max(top_k, 5)),
-                mode=mode,
-                rerank=rerank,
-                query_service=query_service,
-                index_storage_path=storage_root,
-            )
+            if not _RETRIEVAL_CAPACITY.acquire(blocking=False):
+                outcome.update(outcome="failed", reason="retrieval_capacity")
+                outcome["latency_ms"] = max(
+                    0, int((time.monotonic() - source_started) * 1000)
+                )
+                return
+            try:
+                retrieval = _RETRIEVAL_EXECUTOR.submit(
+                    _retrieve_for_index,
+                    index_id=index_id,
+                    question=question,
+                    top_k=min(20, max(top_k, 5)),
+                    mode=mode,
+                    rerank=rerank,
+                    query_service=query_service,
+                    index_storage_path=storage_root,
+                )
+            except BaseException:
+                _RETRIEVAL_CAPACITY.release()
+                raise
+            retrieval.add_done_callback(_release_retrieval_capacity)
             try:
                 candidates = _non_empty_results(
                     retrieval.result(timeout=source_timeout)
@@ -278,7 +302,8 @@ def run_multi_query(
                 0, int((time.monotonic() - source_started) * 1000)
             )
             return
-        except Exception:
+        except Exception as exc:
+            logger.warning("Retrieval failed for index %s", index_id, exc_info=exc)
             outcome.update(outcome="failed", reason="retrieval_error")
             outcome["latency_ms"] = max(
                 0, int((time.monotonic() - source_started) * 1000)
@@ -347,7 +372,8 @@ def run_multi_query(
                     }
                     outcomes[repository_id] = existing
                 existing.update(outcome="failed", reason="timeout", latency_ms=None)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Multi-index orchestration failed for repository %s", repository_id, exc_info=exc)
                 existing = outcomes.get(repository_id)
                 if existing is None:
                     existing = {
