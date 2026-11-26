@@ -13,6 +13,7 @@ from rag.generation.multi_query import AllIndexesUnavailable, run_multi_query
 class FakeRetriever:
     def __init__(self, chunks_by_index):
         self.chunks_by_index = chunks_by_index
+
     def retrieve(self, index_id, question, top_k=10):
         return self.chunks_by_index.get(index_id, [])[:top_k]
 
@@ -21,6 +22,7 @@ class FakeLanguageModel:
     def __init__(self, text="Evidence found [1]."):
         self.text = text
         self.calls = 0
+
     def generate(self, *, question, context):
         self.calls += 1
         return type(
@@ -33,6 +35,7 @@ class FakeLanguageModel:
 class FakeRegistry:
     def __init__(self, rows):
         self.rows = rows
+
     def get(self, index_id):
         return self.rows.get(index_id)
 
@@ -50,6 +53,7 @@ def make_chunk(chunk_id, text):
 
 def make_result(chunk, score=0.9, rank=1):
     from rag.retrieval.dense import RetrievedChunk
+
     return RetrievedChunk(chunk=chunk, score=score, rank=rank)
 
 
@@ -60,10 +64,14 @@ def setup(tmp_path, chunks, rows):
         directory.mkdir(parents=True)
         (directory / "manifest.json").write_text("{}", encoding="utf-8")
     model = FakeLanguageModel()
-    service = type("Service", (), {
-        "retriever": FakeRetriever(chunks),
-        "language_model": model,
-    })()
+    service = type(
+        "Service",
+        (),
+        {
+            "retriever": FakeRetriever(chunks),
+            "language_model": model,
+        },
+    )()
     return root, service, model, FakeRegistry(rows)
 
 
@@ -191,7 +199,6 @@ def test_multi_query_reports_all_sources_unavailable(tmp_path):
         raise AssertionError("all unavailable indexes must raise")
 
 
-
 def test_multi_query_endpoint_rejects_focus_outside_scope(tmp_path):
     settings = Settings(
         rag_api_key="test-key",
@@ -258,7 +265,10 @@ def test_multi_query_endpoint_returns_503_when_all_indexes_are_unavailable(tmp_p
     )
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "ALL_INDEXES_UNAVAILABLE"
-    assert response.json()["error"]["details"]["repository_outcomes"][0]["outcome"] == "unavailable"
+    assert (
+        response.json()["error"]["details"]["repository_outcomes"][0]["outcome"]
+        == "unavailable"
+    )
 
 
 
@@ -343,7 +353,6 @@ def test_timed_out_focus_source_does_not_block_in_scope_fallback(tmp_path, monke
 def test_timed_out_focus_preflight_does_not_block_in_scope_fallback(
     tmp_path, monkeypatch
 ):
-    import time
     from rag.generation import multi_query
 
     class SlowFocusVectorStore:
