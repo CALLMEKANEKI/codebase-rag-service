@@ -130,7 +130,7 @@ Validation:
 7. If all eligible repositories are searched and evidence is insufficient, return grounded `no_evidence`; do not invent code behavior.
 8. No cross-conversation or out-of-Scope search is permitted.
 
-MVP evidence-sufficiency policy is deterministic: Focus is considered sufficient when at least two non-empty chunks are retrieved across the searched Focus repositories. This is a measurable retrieval-expansion heuristic, not a semantic guarantee that the chunks answer the question. The response exposes source evidence counts; when request `debug=true`, it also returns candidate/fusion/context counts and provenance for chunks actually placed in the final model context. This heuristic must be calibrated against the agreed fixtures. Any LLM-based sufficiency classifier requires a separate latency/cost evaluation and approval.
+MVP evidence-sufficiency policy is deterministic: Focus is considered sufficient when at least two non-empty chunks are retrieved across the searched Focus repositories. This is a measurable retrieval-expansion heuristic, not a semantic guarantee that the chunks answer the question. The response exposes source evidence counts; when request `debug=true`, it also returns candidate/fusion/context counts and provenance (including fused rank and reciprocal-rank score) for chunks actually placed in the final model context. This heuristic must be calibrated against the agreed fixtures. Any LLM-based sufficiency classifier requires a separate latency/cost evaluation and approval.
 
 ### 4.4 Response shape (RAG → Web Backend only)
 
