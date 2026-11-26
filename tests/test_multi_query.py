@@ -151,6 +151,41 @@ def test_multi_query_falls_back_inside_scope_and_keeps_citation_provenance(tmp_p
     assert model.calls == 1
 
 
+def test_multi_query_debug_returns_selected_context_provenance(tmp_path):
+    rows = {
+        "idx_a": {"status": "ready", "commit_sha": "a" * 40},
+    }
+    root, service, model, registry = setup(
+        tmp_path,
+        {"idx_a": [make_result(make_chunk("a1", "focused evidence"))]},
+        rows,
+    )
+
+    result = run_multi_query(
+        question="Explain this code",
+        scope=[
+            {"repository_id": "repo-a", "index_id": "idx_a", "display_name": "A"}
+        ],
+        focus_repository_ids=[],
+        top_k=4,
+        mode="dense",
+        rerank=False,
+        query_service=service,
+        registry=registry,
+        index_storage_path=root,
+        debug=True,
+    )
+
+    assert result["debug"]["candidate_count"] == 1
+    assert result["debug"]["fused_chunk_count"] == 1
+    assert result["debug"]["context_source_count"] == 1
+    selected = result["debug"]["selected_evidence"][0]
+    assert selected["repository_id"] == "repo-a"
+    assert selected["index_id"] == "idx_a"
+    assert selected["commit_sha"] == "a" * 40
+    assert selected["ref_id"] == 1
+
+
 def test_multi_query_rejects_focus_outside_scope(tmp_path):
     root, service, _model, registry = setup(tmp_path, {}, {})
     try:
