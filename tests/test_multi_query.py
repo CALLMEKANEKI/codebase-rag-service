@@ -271,7 +271,6 @@ def test_multi_query_endpoint_returns_503_when_all_indexes_are_unavailable(tmp_p
     )
 
 
-
 def test_multi_query_searches_scope_indexes_in_parallel(tmp_path):
     barrier = threading.Barrier(2)
 
@@ -349,6 +348,7 @@ def test_timed_out_focus_source_does_not_block_in_scope_fallback(tmp_path, monke
     assert result["focus"]["fallback_triggered"] is True
     assert result["focus"]["fallback_repository_ids"] == ["repo-b"]
     assert model.calls == 1
+
 
 def test_timed_out_focus_preflight_does_not_block_in_scope_fallback(
     tmp_path, monkeypatch
