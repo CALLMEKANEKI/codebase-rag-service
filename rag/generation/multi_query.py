@@ -45,11 +45,7 @@ def _release_orchestration_capacity(_future: Any) -> None:
 
 
 def _non_empty_results(results: list[RetrievedChunk]) -> list[RetrievedChunk]:
-    return [
-        item
-        for item in results
-        if str(item.chunk.get("text") or "").strip()
-    ]
+    return [item for item in results if str(item.chunk.get("text") or "").strip()]
 
 
 def _retrieve_for_index(
@@ -105,7 +101,9 @@ def _fuse_by_repository(
             item["score"] += 1.0 / (60 + result.rank)
             if item not in ranked:
                 ranked.append(item)
-        ranked.sort(key=lambda item: (-item["score"], str(item["chunk"].get("chunk_id") or "")))
+        ranked.sort(
+            key=lambda item: (-item["score"], str(item["chunk"].get("chunk_id") or ""))
+        )
         per_repository.append(ranked)
 
     # Reserve one high-ranked candidate per repository first, then fill the
@@ -119,10 +117,7 @@ def _fuse_by_repository(
                 break
 
     remaining = [
-        item
-        for ranked in per_repository
-        for item in ranked
-        if item not in ordered
+        item for ranked in per_repository for item in ranked if item not in ordered
     ]
     remaining.sort(
         key=lambda item: (
@@ -137,6 +132,7 @@ def _fuse_by_repository(
         RetrievedChunk(chunk=item["chunk"], score=item["score"], rank=rank)
         for rank, item in enumerate(ordered[:top_k], start=1)
     ]
+
 
 def run_multi_query(
     *,
@@ -161,9 +157,8 @@ def run_multi_query(
         raise ValueError("scope must contain between 1 and 5 repositories")
     repository_ids = [item["repository_id"] for item in scope]
     index_ids = [item["index_id"] for item in scope]
-    if (
-        len(set(repository_ids)) != len(repository_ids)
-        or len(set(index_ids)) != len(index_ids)
+    if len(set(repository_ids)) != len(repository_ids) or len(set(index_ids)) != len(
+        index_ids
     ):
         raise ValueError("scope repository_id and index_id values must be unique")
     if len(set(focus_repository_ids)) != len(focus_repository_ids):
@@ -260,11 +255,15 @@ def run_multi_query(
                 if not collection_exists:
                     outcome.update(outcome="unavailable", reason="index_not_ready")
                     outcome["latency_ms"] = max(
-                0, int((time.monotonic() - source_started) * 1000)
-            )
+                        0, int((time.monotonic() - source_started) * 1000)
+                    )
                     return
             except Exception as exc:
-                logger.warning("Vector-store availability check failed for %s", index_id, exc_info=exc)
+                logger.warning(
+                    "Vector-store availability check failed for %s",
+                    index_id,
+                    exc_info=exc,
+                )
                 outcome.update(outcome="unavailable", reason="storage_error")
                 outcome["latency_ms"] = max(
                 0, int((time.monotonic() - source_started) * 1000)
@@ -323,7 +322,9 @@ def run_multi_query(
             )
             return
         except Exception as exc:
-            logger.warning("Retrieval failed for index %s", index_id, exc_info=exc)
+            logger.warning(
+                "Retrieval failed for index %s", index_id, exc_info=exc
+            )
             outcome.update(outcome="failed", reason="retrieval_error")
             outcome["latency_ms"] = max(
                 0, int((time.monotonic() - source_started) * 1000)
@@ -349,9 +350,7 @@ def run_multi_query(
                 "display_name": repository["display_name"],
                 "commit_sha": row.get("commit_sha"),
                 "focused": (
-                    "true"
-                    if repository_id in set(focus_repository_ids)
-                    else "false"
+                    "true" if repository_id in set(focus_repository_ids) else "false"
                 ),
                 "used_as_fallback": "true" if is_fallback else "false",
             }
@@ -416,7 +415,11 @@ def run_multi_query(
                     outcomes[repository_id] = existing
                 existing.update(outcome="failed", reason="timeout", latency_ms=None)
             except Exception as exc:
-                logger.warning("Multi-index orchestration failed for repository %s", repository_id, exc_info=exc)
+                logger.warning(
+                    "Multi-index orchestration failed for repository %s",
+                    repository_id,
+                    exc_info=exc,
+                )
                 existing = outcomes.get(repository_id)
                 if existing is None:
                     existing = {
@@ -426,7 +429,9 @@ def run_multi_query(
                         "evidence_count": 0,
                     }
                     outcomes[repository_id] = existing
-                existing.update(outcome="failed", reason="retrieval_error", latency_ms=None)
+                existing.update(
+                    outcome="failed", reason="retrieval_error", latency_ms=None
+                )
 
     search_batch(focused, is_fallback=False)
 
@@ -482,9 +487,11 @@ def run_multi_query(
     if available_count == 0:
         raise AllIndexesUnavailable(repository_outcomes)
 
-    scope_order = {item['repository_id']: position for position, item in enumerate(scope)}
+    scope_order = {
+        item["repository_id"]: position for position, item in enumerate(scope)
+    }
     retrieved_groups.sort(
-        key=lambda pair: scope_order.get(pair[0]['repository_id'], _MAX_SCOPE)
+        key=lambda pair: scope_order.get(pair[0]["repository_id"], _MAX_SCOPE)
     )
     fused = _fuse_by_repository(retrieved_groups, top_k=top_k)
     context = build_context(fused)
@@ -516,7 +523,8 @@ def run_multi_query(
         fallback_names = [
             item["display_name"]
             for item in remaining
-            if outcomes[item["repository_id"]]["outcome"] in {
+            if outcomes[item["repository_id"]]["outcome"]
+            in {
                 "searched_with_evidence",
                 "searched_no_evidence",
                 "unavailable",
@@ -539,9 +547,7 @@ def run_multi_query(
             )
         else:
             focus_label = (
-                ", ".join(focus_names)
-                if focus_names
-                else "none; search the full Scope"
+                ", ".join(focus_names) if focus_names else "none; search the full Scope"
             )
             guidance = (
                 f"User focus repositories: {focus_label}. "
@@ -605,15 +611,15 @@ def run_multi_query(
                     "Các repository trong Conversation Scope chưa cung cấp "
                     "đủ bằng chứng. "
                     "Hãy kiểm tra lại Scope/Focus hoặc làm rõ nếu câu hỏi liên quan "
-            "đến mã nguồn "
+                    "đến mã nguồn "
                     "nằm ngoài các repository đã lập chỉ mục."
                 )
             else:
                 answer = (
                     "The indexed repositories in this conversation Scope did not "
-            "provide enough "
+                    "provide enough "
                     "evidence. Check the Scope/Focus selection or clarify if the "
-            "question is about "
+                    "question is about "
                     "code outside the indexed repositories."
                 )
         if generated.input_tokens is not None or generated.output_tokens is not None:
@@ -623,9 +629,7 @@ def run_multi_query(
             }
         for citation in citations:
             source = next(
-                item
-                for item in context.sources
-                if item.ref_id == citation["ref_id"]
+                item for item in context.sources if item.ref_id == citation["ref_id"]
             )
             chunk = source.chunk
             citation.update(
@@ -637,8 +641,7 @@ def run_multi_query(
     execution_status = (
         "partial"
         if any(
-            item["outcome"] in {"unavailable", "failed"}
-            for item in repository_outcomes
+            item["outcome"] in {"unavailable", "failed"} for item in repository_outcomes
         )
         else "completed"
     )
@@ -651,7 +654,8 @@ def run_multi_query(
             "searched_focus_repository_ids": [
                 repository_id
                 for repository_id in focus_repository_ids
-                if outcomes[repository_id]["outcome"] in {
+                if outcomes[repository_id]["outcome"]
+                in {
                     "searched_with_evidence",
                     "searched_no_evidence",
                 }
