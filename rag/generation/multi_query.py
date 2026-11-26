@@ -21,6 +21,10 @@ _RETRIEVAL_EXECUTOR = ThreadPoolExecutor(
     max_workers=_MAX_SCOPE,
     thread_name_prefix="rag-multi-retrieve",
 )
+_ORCHESTRATION_EXECUTOR = ThreadPoolExecutor(
+    max_workers=_MAX_SCOPE,
+    thread_name_prefix="rag-multi-orchestrate",
+)
 
 
 def _non_empty_results(results: list[RetrievedChunk]) -> list[RetrievedChunk]:
@@ -61,7 +65,7 @@ def _fuse_by_repository(
     *,
     top_k: int,
 ) -> list[RetrievedChunk]:
-    """Apply rank fusion, then interleave repositories to prevent context crowding."""
+    """Fuse rank scores globally while reserving an initial slot per repository."""
     fused_by_key: dict[tuple[str, str], dict[str, Any]] = {}
     per_repository: list[list[dict[str, Any]]] = []
 
@@ -79,40 +83,43 @@ def _fuse_by_repository(
             key = (repository["index_id"], chunk_id or str(id(result.chunk)))
             item = fused_by_key.setdefault(
                 key,
-                {
-                    "chunk": chunk,
-                    "score": 0.0,
-                    "repository_id": repository["repository_id"],
-                },
+                {"chunk": chunk, "score": 0.0},
             )
             item["score"] += 1.0 / (60 + result.rank)
-            ranked.append(item)
+            if item not in ranked:
+                ranked.append(item)
+        ranked.sort(key=lambda item: (-item["score"], str(item["chunk"].get("chunk_id") or "")))
         per_repository.append(ranked)
 
-    # Stable round-robin selection gives every searched repository a fair chance
-    # before the global top_k context budget is applied.
+    # Reserve one high-ranked candidate per repository first, then fill the
+    # remaining global budget by fused score. This balances sources without
+    # discarding relevance ordering for the rest of the context.
     ordered: list[dict[str, Any]] = []
-    positions = [0] * len(per_repository)
-    while len(ordered) < top_k:
-        progressed = False
-        for index, ranked in enumerate(per_repository):
-            position = positions[index]
-            if position < len(ranked):
-                candidate = ranked[position]
-                positions[index] += 1
-                if candidate not in ordered:
-                    ordered.append(candidate)
-                    progressed = True
-                    if len(ordered) >= top_k:
-                        break
-        if not progressed:
-            break
+    for ranked in per_repository:
+        if ranked and ranked[0] not in ordered:
+            ordered.append(ranked[0])
+            if len(ordered) == top_k:
+                break
+
+    remaining = [
+        item
+        for ranked in per_repository
+        for item in ranked
+        if item not in ordered
+    ]
+    remaining.sort(
+        key=lambda item: (
+            -item["score"],
+            str(item["chunk"].get("repository_id") or ""),
+            str(item["chunk"].get("chunk_id") or ""),
+        )
+    )
+    ordered.extend(remaining[: max(0, top_k - len(ordered))])
 
     return [
         RetrievedChunk(chunk=item["chunk"], score=item["score"], rank=rank)
         for rank, item in enumerate(ordered[:top_k], start=1)
     ]
-
 
 def run_multi_query(
     *,
@@ -231,6 +238,12 @@ def run_multi_query(
                 return
 
         try:
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                raise TimeoutError("Multi-index request deadline elapsed")
+            # Bound each source independently so a slow Focus index does not
+            # consume the entire request budget and prevent in-Scope fallback.
+            source_timeout = min(15.0, remaining_seconds)
             retrieval = _RETRIEVAL_EXECUTOR.submit(
                 _retrieve_for_index,
                 index_id=index_id,
@@ -241,19 +254,23 @@ def run_multi_query(
                 query_service=query_service,
                 index_storage_path=storage_root,
             )
-            remaining_seconds = deadline - time.monotonic()
-            if remaining_seconds <= 0:
-                retrieval.cancel()
-                raise TimeoutError("Multi-index request deadline elapsed")
             try:
                 candidates = _non_empty_results(
-                    retrieval.result(timeout=remaining_seconds)
+                    retrieval.result(timeout=source_timeout)
                 )
-            except FutureTimeoutError as exc:
+            except FutureTimeoutError:
                 retrieval.cancel()
-                raise TimeoutError("Multi-index request deadline elapsed") from exc
+                outcome.update(outcome="failed", reason="timeout")
+                outcome["latency_ms"] = max(
+                    0, int((time.monotonic() - source_started) * 1000)
+                )
+                return
         except (TimeoutError, httpx.TimeoutException):
-            raise
+            outcome.update(outcome="failed", reason="timeout")
+            outcome["latency_ms"] = max(
+                0, int((time.monotonic() - source_started) * 1000)
+            )
+            return
         except OSError:
             outcome.update(outcome="unavailable", reason="storage_error")
             outcome["latency_ms"] = max(
@@ -290,8 +307,58 @@ def run_multi_query(
             }
             retrieved_groups.append((metadata, candidates))
 
-    for repository in focused:
-        search_repository(repository, is_fallback=False)
+    def search_batch(repositories: list[dict[str, str]], *, is_fallback: bool) -> None:
+        if not repositories:
+            return
+        futures = {
+            _ORCHESTRATION_EXECUTOR.submit(
+                search_repository, repository, is_fallback=is_fallback
+            ): repository
+            for repository in repositories
+        }
+        for future, repository in futures.items():
+            repository_id = repository["repository_id"]
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                future.cancel()
+                existing = outcomes.get(repository_id)
+                if existing is None:
+                    existing = {
+                        "repository_id": repository_id,
+                        "index_id": repository["index_id"],
+                        "commit_sha": None,
+                        "evidence_count": 0,
+                    }
+                    outcomes[repository_id] = existing
+                existing.update(outcome="failed", reason="timeout", latency_ms=None)
+                continue
+            try:
+                future.result(timeout=remaining_seconds)
+            except FutureTimeoutError:
+                future.cancel()
+                existing = outcomes.get(repository_id)
+                if existing is None:
+                    existing = {
+                        "repository_id": repository_id,
+                        "index_id": repository["index_id"],
+                        "commit_sha": None,
+                        "evidence_count": 0,
+                    }
+                    outcomes[repository_id] = existing
+                existing.update(outcome="failed", reason="timeout", latency_ms=None)
+            except Exception:
+                existing = outcomes.get(repository_id)
+                if existing is None:
+                    existing = {
+                        "repository_id": repository_id,
+                        "index_id": repository["index_id"],
+                        "commit_sha": None,
+                        "evidence_count": 0,
+                    }
+                    outcomes[repository_id] = existing
+                existing.update(outcome="failed", reason="retrieval_error", latency_ms=None)
+
+    search_batch(focused, is_fallback=False)
 
     focused_outcomes = [outcomes[item["repository_id"]] for item in focused]
     focused_available = any(
@@ -316,8 +383,7 @@ def run_multi_query(
             if focused_available
             else "focused_sources_unavailable"
         )
-        for repository in remaining:
-            search_repository(repository, is_fallback=True)
+        search_batch(remaining, is_fallback=True)
     elif remaining:
         for repository in remaining:
             existing_row = registry.get(repository["index_id"])
