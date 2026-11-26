@@ -182,7 +182,7 @@ def test_multi_query_debug_returns_selected_context_provenance(tmp_path):
     rows = {
         "idx_a": {"status": "ready", "commit_sha": "a" * 40},
     }
-    root, service, model, registry = setup(
+    root, service, _model, registry = setup(
         tmp_path,
         {"idx_a": [make_result(make_chunk("a1", "focused evidence"))]},
         rows,
