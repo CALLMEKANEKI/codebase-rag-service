@@ -23,8 +23,8 @@ from rag.embeddings.cache import CachedEmbedder, SQLiteEmbeddingCache
 from rag.embeddings.sentence_transformer import SentenceTransformerEmbedder
 from rag.generation.base import LLMError
 from rag.generation.factory import build_language_model
-from rag.generation.service import QueryService
 from rag.generation.multi_query import AllIndexesUnavailable, run_multi_query
+from rag.generation.service import QueryService
 from rag.index_registry import IndexRegistry
 from rag.indexing_pipeline import IndexCancelled, run_indexing
 from rag.ingestion.clone import validate_repo_url
