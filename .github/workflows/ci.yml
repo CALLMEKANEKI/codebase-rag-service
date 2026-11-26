@@ -23,6 +23,9 @@ jobs:
             requirements-dev.txt
       - name: Install development dependencies
         run: python -m pip install -r requirements-dev.txt
+      - name: Validate OpenAPI contract
+        run: |
+          python -c "from pathlib import Path; import yaml; from openapi_spec_validator import validate; validate(yaml.safe_load(Path('contracts/openapi.yaml').read_text(encoding='utf-8')))"
       - name: Lint
         run: ruff check .
       - name: Check formatting
