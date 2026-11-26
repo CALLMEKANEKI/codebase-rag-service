@@ -109,7 +109,7 @@ Field rules:
 - `focus_repository_ids`: optional unique list of Web Repository IDs; must be a subset of scope. Omitted/empty means search the entire Scope without a preferred subset.
 - `top_k`: global final evidence-chunk limit after fusion, range 1–20. Per-index candidate counts and allocation are RAG internals; do not divide final topK into independent answers.
 - `options`: preserve supported RAG retrieval options. MVP default is hybrid with rerank disabled unless separately configured/approved.
-- `debug`: false in normal Web traffic.
+- `debug`: false in normal Web traffic. When true, RAG returns bounded retrieval diagnostics in the response; when false, `debug` is null.
 
 Validation:
 1. Reject empty Scope, duplicate repository IDs, duplicate index IDs, malformed IDs and invalid question/options.
@@ -130,7 +130,7 @@ Validation:
 7. If all eligible repositories are searched and evidence is insufficient, return grounded `no_evidence`; do not invent code behavior.
 8. No cross-conversation or out-of-Scope search is permitted.
 
-Evidence-sufficiency policy is RAG-owned and must be deterministic/inspectable for the first MVP, documented with diagnostics and calibrated against the agreed fixtures. Any LLM-based sufficiency classifier requires a separate latency/cost evaluation and approval.
+MVP evidence-sufficiency policy is deterministic: Focus is considered sufficient when at least two non-empty chunks are retrieved across the searched Focus repositories. This is a measurable retrieval-expansion heuristic, not a semantic guarantee that the chunks answer the question. The response exposes source evidence counts; when request `debug=true`, it also returns candidate/fusion/context counts and provenance for chunks actually placed in the final model context. This heuristic must be calibrated against the agreed fixtures. Any LLM-based sufficiency classifier requires a separate latency/cost evaluation and approval.
 
 ### 4.4 Response shape (RAG → Web Backend only)
 
@@ -182,7 +182,8 @@ Evidence-sufficiency policy is RAG-owned and must be deterministic/inspectable f
     }
   ],
   "usage": null,
-  "latency_ms": 920
+  "latency_ms": 920,
+  "debug": null
 }
 ```
 
@@ -208,8 +209,8 @@ Accepted `reason` values:
 | Outcome | Reason |
 |---|---|
 | `not_searched` | `focus_evidence_sufficient` |
-| `unavailable` | `index_not_found`, `index_not_ready`, `storage_error`, `timeout` (RAG) |
-| `failed` | `retrieval_error` |
+| `unavailable` | `index_not_found`, `index_not_ready`, `storage_error` |
+| `failed` | `timeout`, `retrieval_error`, `retrieval_capacity` |
 
 Web may add Web-originated source outcomes to its stored/UI snapshot when a repository in the conversation Scope cannot be submitted to RAG:
 - `unavailable / repository_not_ready`
