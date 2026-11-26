@@ -16,6 +16,7 @@ from rag.retrieval.reranker import CrossEncoderReranker, RerankingRetriever
 
 
 _EVIDENCE_SUFFICIENCY_MIN_CHUNKS = 2
+_PER_INDEX_TIMEOUT_SECONDS = 15.0
 _MAX_SCOPE = 5
 _RETRIEVAL_EXECUTOR = ThreadPoolExecutor(
     max_workers=_MAX_SCOPE,
@@ -243,7 +244,7 @@ def run_multi_query(
                 raise TimeoutError("Multi-index request deadline elapsed")
             # Bound each source independently so a slow Focus index does not
             # consume the entire request budget and prevent in-Scope fallback.
-            source_timeout = min(15.0, remaining_seconds)
+            source_timeout = min(_PER_INDEX_TIMEOUT_SECONDS, remaining_seconds)
             retrieval = _RETRIEVAL_EXECUTOR.submit(
                 _retrieve_for_index,
                 index_id=index_id,
@@ -412,6 +413,10 @@ def run_multi_query(
     if available_count == 0:
         raise AllIndexesUnavailable(repository_outcomes)
 
+    scope_order = {item['repository_id']: position for position, item in enumerate(scope)}
+    retrieved_groups.sort(
+        key=lambda pair: scope_order.get(pair[0]['repository_id'], _MAX_SCOPE)
+    )
     fused = _fuse_by_repository(retrieved_groups, top_k=top_k)
     context = build_context(fused)
     usage = None
