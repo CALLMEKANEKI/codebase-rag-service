@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
 import threading
 import time
+
+from fastapi.testclient import TestClient
 
 from api.main import create_app
 from rag.config import Settings
@@ -142,7 +143,7 @@ def test_multi_query_falls_back_inside_scope_and_keeps_citation_provenance(tmp_p
 
 
 def test_multi_query_rejects_focus_outside_scope(tmp_path):
-    root, service, model, registry = setup(tmp_path, {}, {})
+    root, service, _model, registry = setup(tmp_path, {}, {})
     try:
         run_multi_query(
             question="Explain this code",
@@ -298,7 +299,7 @@ def test_multi_query_searches_scope_indexes_in_parallel(tmp_path):
 
 
 def test_timed_out_focus_source_does_not_block_in_scope_fallback(tmp_path, monkeypatch):
-    import rag.generation.multi_query as multi_query
+    from rag.generation import multi_query
 
     class SlowFocusRetriever:
         def retrieve(self, index_id, question, top_k=10):
