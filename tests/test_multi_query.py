@@ -207,6 +207,8 @@ def test_multi_query_debug_returns_selected_context_provenance(tmp_path):
     assert selected["index_id"] == "idx_a"
     assert selected["commit_sha"] == "a" * 40
     assert selected["ref_id"] == 1
+    assert selected["fused_rank"] == 1
+    assert selected["score"] is not None
 
 
 def test_multi_query_rejects_focus_outside_scope(tmp_path):
