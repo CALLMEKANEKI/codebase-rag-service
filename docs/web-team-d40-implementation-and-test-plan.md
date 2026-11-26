@@ -73,6 +73,28 @@ Removing a repository from scope or deleting it later must not rewrite old messa
 - If all eligible repositories fail/unavailable, return a clear error state rather than a fabricated answer.
 - If all repositories are searched successfully but no sufficient evidence is found, return a no-evidence response and invite the user to verify the selected focus/scope or clarify whether the question is outside the indexed codebase.
 
+
+
+### RAG audit update (2026-11-26)
+
+The RAG-only audit fixes are now present on `work/wp6-retrieval-reranking` at commit `69e6fb358876a100eda5712347ead79e5b1e897a`:
+
+- Repaired the malformed `MultiQueryScopeItem` and `MultiCitation` OpenAPI schema fragments and added an OpenAPI validator to CI.
+- Added bounded admission for orchestration and retrieval workers. A timed-out running worker retains its capacity slot until it actually exits, preventing unbounded queued work and silent worker-pool exhaustion.
+- Applied the per-index deadline across registry/vector-store preflight and retrieval; source timeouts are reported independently and can still permit fallback within Scope.
+- Kept the deterministic two-non-empty-chunk Focus sufficiency heuristic and documented it as a measurable proxy, not semantic proof.
+- Added opt-in `debug` diagnostics: candidate count, fused count, final context-source count, and provenance/rank/score for chunks included in the final model context.
+- Expanded tests for concurrent retrieval, focused retrieval timeout and fallback, preflight timeout and fallback, empty-evidence semantics, diagnostics, and multi-index OpenAPI provenance.
+
+Validation on commit `69e6fb3`:
+- OpenAPI validation: passed.
+- Ruff lint and format: passed.
+- Pytest: **178 passed**.
+- Dataset validation and pinned Flask ingestion smoke test: passed.
+- CI run: [#227](https://github.com/CALLMEKANEKI/codebase-rag-service/actions/runs/45747217680).
+
+This is not D40 E2E acceptance, Eval Runner execution, Test-set evaluation, retrieval benchmark, merge, or deployment. Those remain outside this validation run and require their own approval.
+
 ## 3. Required implementation changes and ownership
 
 ### RAG implementation note (2026-11-25)
@@ -86,7 +108,7 @@ The first RAG implementation pass is now present on `work/wp6-retrieval-rerankin
 - Per-repository outcomes distinguish evidence, no evidence, unavailable, failed and not searched; all-source unavailability maps to 503.
 - The RAG endpoint applies one shared 60-second deadline to bounded retrieval tasks and passes the remaining generation budget to OpenRouter/Gemini. Timed-out retrieval futures are cancelled when possible; a running native/provider call may finish in its worker after the request has returned.
 
-This is an implementation-in-progress note, not a test or acceptance claim. Unit tests have been added but have not been executed. The Web Backend and Frontend implementation and D40 E2E remain pending.
+This was an implementation-in-progress note at the time it was written, not a test or acceptance claim. The Web Backend and Frontend implementation and D40 E2E remain separate workstreams.
 
 ## 3. Required implementation changes and ownership
 
